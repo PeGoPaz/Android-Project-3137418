@@ -1,0 +1,5 @@
+<resources>
+    <!-- The window behind Compose, so that the app does not flash white while it starts. -->
+    <color name="background">#FF0B0F14</color>
+    <color name="ic_launcher_background">#FF0F2A2A</color>
+</resources>

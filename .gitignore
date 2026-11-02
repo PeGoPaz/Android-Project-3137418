@@ -1,2 +1,14 @@
 # macOS
 .DS_Store
+
+# Gradle and Android build output
+.gradle/
+.kotlin/
+build/
+local.properties
+*.apk
+*.aab
+
+# IDEs
+.idea/
+*.iml
