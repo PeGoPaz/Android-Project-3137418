@@ -12,7 +12,7 @@ android {
         applicationId = "tech.vladr.aegis"
         // Android 12: the first version with the Bluetooth permissions Aegis will need in v2.
         minSdk = 31
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
     }
