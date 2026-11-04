@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 
 /** A screen's title and a line under it, as at the top of the Live Scan mockup. */
 @Composable
-fun ScreenTitle(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
+fun ScreenTitle(title: String, modifier: Modifier = Modifier, subtitle: String? = null) {
     Column(modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
         Text(title, style = MaterialTheme.typography.titleLarge)
         if (subtitle != null) {
