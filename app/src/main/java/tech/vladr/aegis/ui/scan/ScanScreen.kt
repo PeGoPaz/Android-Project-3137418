@@ -47,12 +47,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.text.DateFormat
 import java.util.Date
+import kotlin.math.roundToInt
+import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.scan.WifiNetwork
 import tech.vladr.aegis.scan.isUnsafe
 import tech.vladr.aegis.ui.components.EmptyState
 import tech.vladr.aegis.ui.components.ScreenTitle
 import tech.vladr.aegis.ui.components.SignalBars
+import tech.vladr.aegis.ui.components.StatusTag
 import tech.vladr.aegis.ui.components.Tag
 import tech.vladr.aegis.ui.theme.Suspicious
 import tech.vladr.aegis.ui.theme.Warning
@@ -91,7 +94,9 @@ fun ScanScreen(viewModel: ScanViewModel = viewModel(factory = ScanViewModel.Fact
             subtitle = if (state.lastScanAt == null) "No scan yet" else "${state.networks.size} networks nearby",
         )
         state.lastScanAt?.let { at ->
-            InfoLine("Last scan at ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(at))}")
+            val place = state.fix?.let { fix -> fix.accuracyMetres?.let { "location ±${it.roundToInt()} m" } ?: "location found" }
+                ?: "no location fix, saved without a place"
+            InfoLine("Last scan at ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(at))} · $place")
         }
         (problem ?: state.notice)?.let { message ->
             InfoLine(message, color = Warning)
@@ -108,7 +113,7 @@ fun ScanScreen(viewModel: ScanViewModel = viewModel(factory = ScanViewModel.Fact
             } else {
                 LazyColumn {
                     items(state.networks, key = { it.bssid }) { network ->
-                        NetworkRow(network)
+                        NetworkRow(network, status = state.known[network.bssid]?.status)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     }
                 }
@@ -147,7 +152,7 @@ private fun InfoLine(text: String, color: androidx.compose.ui.graphics.Color = M
 
 /** One network: its name, address and protection, and how strong its signal is. */
 @Composable
-fun NetworkRow(network: WifiNetwork, modifier: Modifier = Modifier) {
+fun NetworkRow(network: WifiNetwork, modifier: Modifier = Modifier, status: DeviceStatus? = null) {
     Row(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -172,6 +177,7 @@ fun NetworkRow(network: WifiNetwork, modifier: Modifier = Modifier) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
+                StatusTag(status)
                 when (network.security) {
                     Security.OPEN -> Tag("OPEN", Warning)
                     Security.WEP -> Tag("WEP", Suspicious)
