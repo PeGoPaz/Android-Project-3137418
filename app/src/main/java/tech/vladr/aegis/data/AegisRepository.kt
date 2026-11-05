@@ -13,6 +13,9 @@ class AegisRepository(private val db: AegisDatabase) {
 
     fun devices(): Flow<List<Device>> = db.devices().observeAll()
 
+    /** Sightings with a location, oldest first: what the map is drawn from. */
+    fun locatedSightings(): Flow<List<Sighting>> = db.sightings().observeLocated()
+
     /**
      * Saves a scan: each network becomes a device the first time it is seen
      * and gets a sighting every time, with where the phone was. All in one
