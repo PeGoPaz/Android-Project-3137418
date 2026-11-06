@@ -25,6 +25,16 @@ interface AlertDao {
     @Query("SELECT COUNT(*) FROM alert WHERE deviceId = :deviceId AND kind = :kind AND dismissed = 0")
     suspend fun countActive(deviceId: Long, kind: AlertKind): Int
 
+    /** Every alert of a kind a device has had, dismissed or not. */
+    @Query("SELECT COUNT(*) FROM alert WHERE deviceId = :deviceId AND kind = :kind")
+    suspend fun countAll(deviceId: Long, kind: AlertKind): Int
+
+    @Query("SELECT COUNT(*) FROM alert WHERE dismissed = 0")
+    fun observeActiveCount(): Flow<Int>
+
+    @Query("UPDATE alert SET dismissed = 1 WHERE deviceId = :deviceId")
+    suspend fun dismissFor(deviceId: Long)
+
     @Query("UPDATE alert SET dismissed = 1 WHERE id = :id")
     suspend fun dismiss(id: Long)
 }

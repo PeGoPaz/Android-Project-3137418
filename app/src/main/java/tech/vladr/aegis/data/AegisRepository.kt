@@ -2,6 +2,7 @@ package tech.vladr.aegis.data
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import tech.vladr.aegis.detection.isUnsafeNetwork
 import tech.vladr.aegis.scan.WifiNetwork
 import tech.vladr.aegis.sensors.Fix
 
@@ -21,7 +22,11 @@ class AegisRepository(private val db: AegisDatabase) {
     /** One device's history, newest first. */
     fun sightings(deviceId: Long): Flow<List<Sighting>> = db.sightings().observeForDevice(deviceId)
 
-    suspend fun setStatus(deviceId: Long, status: DeviceStatus) = db.devices().setStatus(deviceId, status)
+    /** Marking a device as yours also settles its alerts: yours never alert. */
+    suspend fun setStatus(deviceId: Long, status: DeviceStatus) = db.withTransaction {
+        db.devices().setStatus(deviceId, status)
+        if (status == DeviceStatus.TRUSTED || status == DeviceStatus.HOME) db.alerts().dismissFor(deviceId)
+    }
 
     /** A blank name goes back to the network's own. */
     suspend fun rename(deviceId: Long, name: String) = db.devices().rename(deviceId, name.trim().ifEmpty { null })
@@ -32,7 +37,8 @@ class AegisRepository(private val db: AegisDatabase) {
 
     /**
      * Saves a scan: each network becomes a device the first time it is seen
-     * and gets a sighting every time, with where the phone was. All in one
+     * and gets a sighting every time, with where the phone was. An unsafe
+     * network gets an alert - once: dismissing it is an answer. All in one
      * transaction, so a scan is saved whole or not at all.
      */
     suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long): List<Device> = db.withTransaction {
@@ -62,7 +68,16 @@ class AegisRepository(private val db: AegisDatabase) {
                     timestamp = time,
                 ),
             )
+            if (isUnsafeNetwork(device) && db.alerts().countAll(device.id, AlertKind.UNSAFE_NETWORK) == 0) {
+                db.alerts().insert(Alert(deviceId = device.id, kind = AlertKind.UNSAFE_NETWORK, createdAt = time))
+            }
             device
         }
     }
+
+    fun activeAlerts(): Flow<List<AlertWithDevice>> = db.alerts().observeActive()
+
+    fun activeAlertCount(): Flow<Int> = db.alerts().observeActiveCount()
+
+    suspend fun dismissAlert(alertId: Long) = db.alerts().dismiss(alertId)
 }

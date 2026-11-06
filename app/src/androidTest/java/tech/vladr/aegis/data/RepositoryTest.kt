@@ -69,3 +69,46 @@ class RepositoryTest {
         assertEquals(DeviceStatus.TRUSTED, device.status)
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class AlertsTest {
+    private lateinit var db: AegisDatabase
+    private lateinit var repository: AegisRepository
+
+    @Before
+    fun open() {
+        db = Room.inMemoryDatabaseBuilder(InstrumentationRegistry.getInstrumentation().targetContext, AegisDatabase::class.java).build()
+        repository = AegisRepository(db)
+    }
+
+    @After
+    fun close() = db.close()
+
+    private val airport = WifiNetwork(ssid = "Airport_Free_WiFi", bssid = "aa:bb:cc:dd:ee:02", security = Security.OPEN, rssi = -70, frequencyMhz = 5180)
+    private val old = WifiNetwork(ssid = "Old router", bssid = "aa:bb:cc:dd:ee:03", security = Security.WEP, rssi = -75, frequencyMhz = 2437)
+    private val cafe = WifiNetwork(ssid = "Cafe", bssid = "aa:bb:cc:dd:ee:01", security = Security.WPA2, rssi = -60, frequencyMhz = 2412)
+
+    @Test
+    fun openAndWepNetworksRaiseAnAlert_protectedOnesDoNot() = runTest {
+        repository.saveScan(listOf(airport, old, cafe), fix = null, time = 1_000)
+        assertEquals(listOf("Airport_Free_WiFi", "Old router").sorted(), repository.activeAlerts().first().map { it.displayName }.sorted())
+        assertEquals(2, repository.activeAlertCount().first())
+    }
+
+    @Test
+    fun aNetworkAlertsOnce_evenAfterTheAlertIsDismissed() = runTest {
+        repository.saveScan(listOf(airport), fix = null, time = 1_000)
+        repository.saveScan(listOf(airport), fix = null, time = 2_000)
+        val alert = repository.activeAlerts().first().single()
+        repository.dismissAlert(alert.alert.id)
+        repository.saveScan(listOf(airport), fix = null, time = 3_000)
+        assertEquals(emptyList<AlertWithDevice>(), repository.activeAlerts().first())
+    }
+
+    @Test
+    fun markingANetworkAsYoursSettlesItsAlert() = runTest {
+        val id = repository.saveScan(listOf(airport), fix = null, time = 1_000).single().id
+        repository.setStatus(id, DeviceStatus.HOME)
+        assertEquals(0, repository.activeAlertCount().first())
+    }
+}

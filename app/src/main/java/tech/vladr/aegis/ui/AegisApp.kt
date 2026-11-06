@@ -1,6 +1,8 @@
 package tech.vladr.aegis.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -12,12 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import tech.vladr.aegis.AegisApplication
 import tech.vladr.aegis.ui.alerts.AlertsScreen
 import tech.vladr.aegis.ui.detail.DeviceDetailActivity
 import tech.vladr.aegis.ui.map.MapScreen
@@ -35,6 +39,8 @@ fun AegisApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
     val openDevice = { id: Long -> context.startActivity(DeviceDetailActivity.intent(context, id)) }
+    val repository = (context.applicationContext as AegisApplication).repository
+    val alertCount by repository.activeAlertCount().collectAsStateWithLifecycle(initialValue = 0)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val current = backStackEntry?.destination
 
@@ -53,7 +59,12 @@ fun AegisApp() {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(tab.icon, contentDescription = null) },
+                        icon = {
+                            // The number of alerts waiting, on the Alerts tab.
+                            BadgedBox(badge = { if (tab == Tab.Alerts && alertCount > 0) Badge { Text("$alertCount") } }) {
+                                Icon(tab.icon, contentDescription = null)
+                            }
+                        },
                         label = { Text(tab.label) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = MaterialTheme.colorScheme.primary,
@@ -68,7 +79,7 @@ fun AegisApp() {
         NavHost(navController, startDestination = Tab.Map.route, modifier = Modifier.padding(padding)) {
             composable(Tab.Map.route) { MapScreen(onDeviceClick = openDevice) }
             composable(Tab.Scan.route) { ScanScreen(onDeviceClick = openDevice) }
-            composable(Tab.Alerts.route) { AlertsScreen() }
+            composable(Tab.Alerts.route) { AlertsScreen(onDeviceClick = openDevice) }
             composable(Tab.Settings.route) { SettingsScreen(onTrustedDevices = { navController.navigate(Routes.TRUSTED) }) }
             composable(Routes.TRUSTED) { TrustedDevicesScreen(onBack = { navController.popBackStack() }) }
         }
