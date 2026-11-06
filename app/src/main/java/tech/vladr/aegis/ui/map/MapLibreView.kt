@@ -1,5 +1,6 @@
 package tech.vladr.aegis.ui.map
 
+import android.graphics.RectF
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +32,7 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.ui.components.statusColor
 import tech.vladr.aegis.ui.theme.Background
 import tech.vladr.aegis.ui.theme.Teal
@@ -64,7 +66,10 @@ fun MapLibreView(state: MapUiState, onDeviceClick: (Long) -> Unit, modifier: Mod
                     style = ready
                 }
                 loaded.addOnMapClickListener { point ->
-                    val tapped = loaded.queryRenderedFeatures(loaded.projection.toScreenLocation(point), DEVICES)
+                    // The dots are small: anything within a fingertip of the tap counts.
+                    val at = loaded.projection.toScreenLocation(point)
+                    val area = RectF(at.x - TOUCH_SLOP, at.y - TOUCH_SLOP, at.x + TOUCH_SLOP, at.y + TOUCH_SLOP)
+                    val tapped = loaded.queryRenderedFeatures(area, DEVICE_DOTS)
                     tapped.firstOrNull()?.getNumberProperty("id")?.toLong()?.let { onClick(it) } != null
                 }
             }
@@ -104,6 +109,8 @@ fun MapLibreView(state: MapUiState, onDeviceClick: (Long) -> Unit, modifier: Mod
 
 private const val ROUTE = "route"
 private const val DEVICES = "devices"
+private const val DEVICE_DOTS = "device-dots"
+private const val TOUCH_SLOP = 24f
 
 private fun addLayers(style: Style) {
     style.addSource(GeoJsonSource(ROUTE))
@@ -116,12 +123,14 @@ private fun addLayers(style: Style) {
         ),
     )
     style.addLayer(
-        CircleLayer("device-dots", DEVICES).withProperties(
+        CircleLayer(DEVICE_DOTS, DEVICES).withProperties(
             // Each point carries its colour; unsafe networks get a warning ring.
             PropertyFactory.circleColor(Expression.get("color")),
             PropertyFactory.circleRadius(7f),
             PropertyFactory.circleStrokeColor(Expression.get("ring")),
             PropertyFactory.circleStrokeWidth(2.5f),
+            // Where markers overlap, the ones that matter are drawn on top.
+            PropertyFactory.circleSortKey(Expression.get("rank")),
         ),
     )
 }
@@ -140,11 +149,19 @@ private fun deviceFeatures(markers: List<DeviceMarker>): FeatureCollection =
                 addNumberProperty("id", marker.deviceId)
                 addStringProperty("color", hex(statusColor(marker.status).toArgb()))
                 addStringProperty("ring", hex(if (marker.unsafe) 0xFFF5B83D.toInt() else Background.toArgb()))
+                addNumberProperty("rank", rank(marker))
             }
         },
     )
 
 private fun hex(argb: Int) = "#%06X".format(argb and 0xFFFFFF)
+
+/** Suspicious devices above all, then your own, then unsafe networks, then everything else. */
+private fun rank(marker: DeviceMarker): Int = when (marker.status) {
+    DeviceStatus.SUSPICIOUS -> 3
+    DeviceStatus.TRUSTED, DeviceStatus.HOME -> 2
+    DeviceStatus.UNKNOWN -> if (marker.unsafe) 1 else 0
+}
 
 /** Street level: closer than this, one scan's markers fill the screen and the streets vanish. */
 private const val MAX_FRAMING_ZOOM = 17.0

@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -18,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import tech.vladr.aegis.ui.alerts.AlertsScreen
+import tech.vladr.aegis.ui.detail.DeviceDetailActivity
 import tech.vladr.aegis.ui.map.MapScreen
 import tech.vladr.aegis.ui.scan.ScanScreen
 import tech.vladr.aegis.ui.settings.SettingsScreen
@@ -31,6 +33,8 @@ import tech.vladr.aegis.ui.settings.TrustedDevicesScreen
 @Composable
 fun AegisApp() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val openDevice = { id: Long -> context.startActivity(DeviceDetailActivity.intent(context, id)) }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val current = backStackEntry?.destination
 
@@ -62,8 +66,8 @@ fun AegisApp() {
         },
     ) { padding ->
         NavHost(navController, startDestination = Tab.Map.route, modifier = Modifier.padding(padding)) {
-            composable(Tab.Map.route) { MapScreen() }
-            composable(Tab.Scan.route) { ScanScreen() }
+            composable(Tab.Map.route) { MapScreen(onDeviceClick = openDevice) }
+            composable(Tab.Scan.route) { ScanScreen(onDeviceClick = openDevice) }
             composable(Tab.Alerts.route) { AlertsScreen() }
             composable(Tab.Settings.route) { SettingsScreen(onTrustedDevices = { navController.navigate(Routes.TRUSTED) }) }
             composable(Routes.TRUSTED) { TrustedDevicesScreen(onBack = { navController.popBackStack() }) }

@@ -29,6 +29,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Opened by Aegis itself with an explicit intent; no other app can start it. -->
+        <activity
+            android:name=".ui.detail.DeviceDetailActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

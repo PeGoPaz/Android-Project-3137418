@@ -16,6 +16,20 @@ class AegisRepository(private val db: AegisDatabase) {
     /** Sightings with a location, oldest first: what the map is drawn from. */
     fun locatedSightings(): Flow<List<Sighting>> = db.sightings().observeLocated()
 
+    fun device(id: Long): Flow<Device?> = db.devices().observe(id)
+
+    /** One device's history, newest first. */
+    fun sightings(deviceId: Long): Flow<List<Sighting>> = db.sightings().observeForDevice(deviceId)
+
+    suspend fun setStatus(deviceId: Long, status: DeviceStatus) = db.devices().setStatus(deviceId, status)
+
+    /** A blank name goes back to the network's own. */
+    suspend fun rename(deviceId: Long, name: String) = db.devices().rename(deviceId, name.trim().ifEmpty { null })
+
+    suspend fun clearHistory(deviceId: Long) = db.sightings().deleteForDevice(deviceId)
+
+    suspend fun deleteDevice(deviceId: Long) = db.devices().delete(deviceId)
+
     /**
      * Saves a scan: each network becomes a device the first time it is seen
      * and gets a sighting every time, with where the phone was. All in one

@@ -9,6 +9,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,7 +65,7 @@ private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCAT
 
 /** Networks from the latest scan, strongest signal first, and the button that scans. */
 @Composable
-fun ScanScreen(viewModel: ScanViewModel = viewModel(factory = ScanViewModel.Factory)) {
+fun ScanScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: ScanViewModel = viewModel(factory = ScanViewModel.Factory)) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var problem by remember { mutableStateOf<String?>(null) }
@@ -113,7 +114,13 @@ fun ScanScreen(viewModel: ScanViewModel = viewModel(factory = ScanViewModel.Fact
             } else {
                 LazyColumn {
                     items(state.networks, key = { it.bssid }) { network ->
-                        NetworkRow(network, status = state.known[network.bssid]?.status)
+                        val device = state.known[network.bssid]
+                        NetworkRow(
+                            network,
+                            status = device?.status,
+                            // Saved networks open their page; one not saved (an old result) has none yet.
+                            modifier = if (device != null) Modifier.clickable { onDeviceClick(device.id) } else Modifier,
+                        )
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     }
                 }
