@@ -34,6 +34,8 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig.VERSION_NAME, shown on the Settings screen.
+        buildConfig = true
     }
 }
 
@@ -58,6 +60,7 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.maplibre)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

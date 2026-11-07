@@ -33,6 +33,29 @@ class AegisRepository(private val db: AegisDatabase) {
 
     suspend fun clearHistory(deviceId: Long) = db.sightings().deleteForDevice(deviceId)
 
+    /** Your trusted and home devices, trusted first. */
+    fun ownDevices(): Flow<List<Device>> = db.devices().observeWithStatus(listOf(DeviceStatus.TRUSTED, DeviceStatus.HOME))
+
+    /**
+     * Adds a device of yours by hand, by its address; one Aegis already knows
+     * just takes the name and the status.
+     */
+    suspend fun addOwnDevice(address: String, name: String, status: DeviceStatus, time: Long) = db.withTransaction {
+        val normalised = address.trim().lowercase()
+        val known = db.devices().findByAddress(normalised)
+        if (known == null) {
+            db.devices().insert(
+                Device(address = normalised, name = name.trim(), kind = DeviceKind.WIFI_AP, status = status, firstSeen = time, lastSeen = time),
+            )
+        } else {
+            db.devices().update(known.copy(customName = name.trim().ifEmpty { null } ?: known.customName, status = status))
+            db.alerts().dismissFor(known.id)
+        }
+    }
+
+    /** Forgets everything Aegis has saved: devices, sightings and alerts. */
+    suspend fun deleteEverything() = db.clearAllTables()
+
     suspend fun deleteDevice(deviceId: Long) = db.devices().delete(deviceId)
 
     /**
@@ -41,7 +64,7 @@ class AegisRepository(private val db: AegisDatabase) {
      * network gets an alert - once: dismissing it is an answer. All in one
      * transaction, so a scan is saved whole or not at all.
      */
-    suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long): List<Device> = db.withTransaction {
+    suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean = true): List<Device> = db.withTransaction {
         networks.map { network ->
             val known = db.devices().findByAddress(network.bssid)
             val device = if (known == null) {
@@ -68,7 +91,7 @@ class AegisRepository(private val db: AegisDatabase) {
                     timestamp = time,
                 ),
             )
-            if (isUnsafeNetwork(device) && db.alerts().countAll(device.id, AlertKind.UNSAFE_NETWORK) == 0) {
+            if (alerts && isUnsafeNetwork(device) && db.alerts().countAll(device.id, AlertKind.UNSAFE_NETWORK) == 0) {
                 db.alerts().insert(Alert(deviceId = device.id, kind = AlertKind.UNSAFE_NETWORK, createdAt = time))
             }
             device

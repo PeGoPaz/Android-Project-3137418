@@ -78,3 +78,43 @@ class DatabaseTest {
         assertEquals(0, db.alerts().countActive(id, AlertKind.UNSAFE_NETWORK))
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class OwnDevicesTest {
+    private lateinit var db: AegisDatabase
+    private lateinit var repository: AegisRepository
+
+    @Before
+    fun open() {
+        db = Room.inMemoryDatabaseBuilder(InstrumentationRegistry.getInstrumentation().targetContext, AegisDatabase::class.java).build()
+        repository = AegisRepository(db)
+    }
+
+    @After
+    fun close() = db.close()
+
+    @Test
+    fun trustedFirst_thenHome_thenByName() = runTest {
+        repository.addOwnDevice("aa:00:00:00:00:01", "Router", DeviceStatus.HOME, time = 1)
+        repository.addOwnDevice("aa:00:00:00:00:02", "Watch", DeviceStatus.TRUSTED, time = 1)
+        repository.addOwnDevice("aa:00:00:00:00:03", "Earbuds", DeviceStatus.TRUSTED, time = 1)
+        assertEquals(listOf("Earbuds", "Watch", "Router"), repository.ownDevices().first().map { it.displayName })
+    }
+
+    @Test
+    fun addingAKnownDeviceMarksItInsteadOfAddingItTwice() = runTest {
+        db.devices().insert(Device(address = "aa:00:00:00:00:01", name = "Cafe", kind = DeviceKind.WIFI_AP, firstSeen = 1, lastSeen = 1))
+        repository.addOwnDevice("AA:00:00:00:00:01", "", DeviceStatus.HOME, time = 2)
+        val all = db.devices().observeAll().first()
+        assertEquals(1, all.size)
+        assertEquals(DeviceStatus.HOME, all.single().status)
+        assertEquals("Cafe", all.single().displayName)
+    }
+
+    @Test
+    fun deleteEverythingEmptiesTheDatabase() = runTest {
+        repository.addOwnDevice("aa:00:00:00:00:01", "Router", DeviceStatus.HOME, time = 1)
+        repository.deleteEverything()
+        assertEquals(emptyList<Device>(), db.devices().observeAll().first())
+    }
+}

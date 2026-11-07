@@ -11,12 +11,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tech.vladr.aegis.AegisApplication
 import tech.vladr.aegis.data.AegisRepository
 import tech.vladr.aegis.data.Device
+import tech.vladr.aegis.data.SettingsStore
 import tech.vladr.aegis.scan.WifiNetwork
 import tech.vladr.aegis.scan.WifiScanner
 import tech.vladr.aegis.sensors.Fix
@@ -44,12 +46,16 @@ class ScanViewModel(
     private val scanner: WifiScanner,
     private val locator: Locator,
     private val repository: AegisRepository,
+    private val settings: SettingsStore,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val scan = MutableStateFlow(ScanUiState())
 
-    val state: StateFlow<ScanUiState> = combine(scan, repository.devices()) { state, devices ->
-        state.copy(known = devices.associateBy { it.address })
+    val state: StateFlow<ScanUiState> = combine(scan, repository.devices(), settings.settings) { state, devices, settings ->
+        state.copy(
+            networks = if (settings.showHiddenNetworks) state.networks else state.networks.filter { it.ssid.isNotEmpty() },
+            known = devices.associateBy { it.address },
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ScanUiState())
 
     fun scan() {
@@ -62,16 +68,18 @@ class ScanViewModel(
                 val outcome = scanner.scan()
                 val time = clock()
                 val where = fix.await()
+                val choices = settings.settings.first()
                 // Old results handed back by Android were saved when they were new.
-                if (outcome.fresh) repository.saveScan(outcome.networks, where, time)
+                val notice = when {
+                    !outcome.fresh -> THROTTLED
+                    where == null && !choices.saveWithoutLocation -> NOT_SAVED
+                    else -> {
+                        repository.saveScan(outcome.networks, where, time, alerts = choices.unsafeNetworkAlerts)
+                        null
+                    }
+                }
                 scan.update {
-                    it.copy(
-                        networks = outcome.networks,
-                        scanning = false,
-                        lastScanAt = time,
-                        fix = where,
-                        notice = if (outcome.fresh) null else THROTTLED,
-                    )
+                    it.copy(networks = outcome.networks, scanning = false, lastScanAt = time, fix = where, notice = notice)
                 }
             }
         }
@@ -79,11 +87,12 @@ class ScanViewModel(
 
     companion object {
         const val THROTTLED = "Android allows four scans every two minutes, so these are the latest results it has. They are not saved again."
+        const val NOT_SAVED = "No location fix, so this scan was not saved, as set in Settings."
 
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as AegisApplication
-                ScanViewModel(app.scanner, app.locator, app.repository)
+                ScanViewModel(app.scanner, app.locator, app.repository, app.settings)
             }
         }
     }

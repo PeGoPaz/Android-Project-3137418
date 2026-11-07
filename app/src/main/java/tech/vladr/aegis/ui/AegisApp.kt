@@ -81,7 +81,7 @@ fun AegisApp() {
             composable(Tab.Scan.route) { ScanScreen(onDeviceClick = openDevice) }
             composable(Tab.Alerts.route) { AlertsScreen(onDeviceClick = openDevice) }
             composable(Tab.Settings.route) { SettingsScreen(onTrustedDevices = { navController.navigate(Routes.TRUSTED) }) }
-            composable(Routes.TRUSTED) { TrustedDevicesScreen(onBack = { navController.popBackStack() }) }
+            composable(Routes.TRUSTED) { TrustedDevicesScreen(onBack = { navController.popBackStack() }, onDeviceClick = openDevice) }
         }
     }
 }

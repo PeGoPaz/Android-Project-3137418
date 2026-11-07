@@ -24,8 +24,9 @@ interface DeviceDao {
     @Query("SELECT * FROM device ORDER BY lastSeen DESC")
     fun observeAll(): Flow<List<Device>>
 
-    @Query("SELECT * FROM device WHERE status = :status ORDER BY COALESCE(customName, name)")
-    fun observeWithStatus(status: DeviceStatus): Flow<List<Device>>
+    /** Trusted ones first, then by name. */
+    @Query("SELECT * FROM device WHERE status IN (:statuses) ORDER BY status != 'TRUSTED', COALESCE(customName, name)")
+    fun observeWithStatus(statuses: List<DeviceStatus>): Flow<List<Device>>
 
     @Query("UPDATE device SET status = :status WHERE id = :id")
     suspend fun setStatus(id: Long, status: DeviceStatus)
