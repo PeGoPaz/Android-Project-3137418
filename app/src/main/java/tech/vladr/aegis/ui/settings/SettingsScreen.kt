@@ -18,12 +18,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import tech.vladr.aegis.BuildConfig
 import tech.vladr.aegis.ui.components.ScreenTitle
+import tech.vladr.aegis.ui.openWifiSettings
 import tech.vladr.aegis.ui.theme.Suspicious
 
 /** How Aegis scans, the way to your own devices, and wiping what it saved. */
@@ -31,6 +33,7 @@ import tech.vladr.aegis.ui.theme.Suspicious
 fun SettingsScreen(onTrustedDevices: () -> Unit, viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(Modifier.verticalScroll(rememberScrollState())) {
         ScreenTitle("Settings")
@@ -44,6 +47,7 @@ fun SettingsScreen(onTrustedDevices: () -> Unit, viewModel: SettingsViewModel = 
             viewModel::setSaveWithoutLocation,
         )
         Toggle("Unsafe network alerts", "Warn about open and WEP networks", settings.unsafeNetworkAlerts, viewModel::setUnsafeNetworkAlerts)
+        Entry("Wi-Fi settings", "Android's own: join, leave or forget networks", onClick = { openWifiSettings(context) })
         Divider()
         Entry("Delete everything", "Every network, sighting and alert Aegis has saved", color = Suspicious, onClick = { confirmDelete = true })
         Divider()

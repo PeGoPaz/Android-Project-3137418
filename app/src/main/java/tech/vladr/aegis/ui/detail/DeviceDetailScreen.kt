@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -22,6 +23,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -39,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -52,6 +55,7 @@ import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.data.Sighting
 import tech.vladr.aegis.scan.isUnsafe
 import tech.vladr.aegis.ui.components.SignalBars
+import tech.vladr.aegis.ui.shareText
 import tech.vladr.aegis.ui.components.StatusTag
 import tech.vladr.aegis.ui.components.Tag
 import tech.vladr.aegis.ui.components.statusColor
@@ -65,6 +69,7 @@ fun DeviceDetailScreen(viewModel: DeviceDetailViewModel, onBack: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     // Deleted - from this page or elsewhere: nothing left to show.
     LaunchedEffect(state) { if (state.loaded && state.device == null) onBack() }
@@ -91,6 +96,15 @@ fun DeviceDetailScreen(viewModel: DeviceDetailViewModel, onBack: () -> Unit) {
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
             item { Summary(device, state) }
             item { StatusChooser(device.status, viewModel::setStatus) }
+            item {
+                OutlinedButton(
+                    onClick = { shareText(context, "Aegis report: ${device.displayName}", deviceReport(device, state.sightings)) },
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                ) {
+                    Icon(Icons.Filled.Share, contentDescription = null)
+                    Text("  Share report")
+                }
+            }
             item {
                 Text(
                     "History",
@@ -142,7 +156,7 @@ private fun Summary(device: Device, state: DeviceDetailUiState) {
         Line("BSSID", device.address.uppercase())
         Line("First seen", format.format(Date(device.firstSeen)))
         Line("Last seen", format.format(Date(device.lastSeen)))
-        Line("Seen", "${state.sightings.size} times")
+        Line("Seen", times(state.sightings.size))
         state.strongest?.let { Line("Strongest signal", "$it dBm") }
     }
 }

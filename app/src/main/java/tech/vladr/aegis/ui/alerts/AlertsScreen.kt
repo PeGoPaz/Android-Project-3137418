@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -32,6 +33,7 @@ import tech.vladr.aegis.data.AlertWithDevice
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.detection.unsafeReason
 import tech.vladr.aegis.ui.components.EmptyState
+import tech.vladr.aegis.ui.openWifiSettings
 import tech.vladr.aegis.ui.components.ScreenTitle
 import tech.vladr.aegis.ui.components.Tag
 import tech.vladr.aegis.ui.theme.Suspicious
@@ -58,6 +60,7 @@ fun AlertsScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: AlertsViewModel 
 
 @Composable
 private fun AlertCard(alert: AlertWithDevice, onOpen: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
     val color = if (alert.deviceSecurity == Security.WEP) Suspicious else Warning
     Column(
         Modifier
@@ -83,6 +86,8 @@ private fun AlertCard(alert: AlertWithDevice, onOpen: () -> Unit, onDismiss: () 
         }
         Text(unsafeReason(alert.deviceSecurity), style = MaterialTheme.typography.bodyMedium)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            // If you are on this network now, Android's Wi-Fi settings are where you leave it.
+            TextButton(onClick = { openWifiSettings(context) }) { Text("Wi-Fi settings") }
             TextButton(onClick = onDismiss) { Text("Dismiss") }
         }
     }
