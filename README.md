@@ -5,7 +5,8 @@
 </p>
 
 <p align="center">
-  <img alt="Status" src="https://img.shields.io/badge/status-early%20development-orange">
+  <a href="https://github.com/PeGoPaz/Android-Project-3137418/actions/workflows/android.yml"><img alt="Build" src="https://github.com/PeGoPaz/Android-Project-3137418/actions/workflows/android.yml/badge.svg"></a>
+  <img alt="Status" src="https://img.shields.io/badge/status-v1%20Wi--Fi-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Android%2012%2B-3ddc84">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7f52ff">
   <img alt="No Google Play Services" src="https://img.shields.io/badge/Google%20Play%20Services-not%20required-lightgrey">
@@ -18,7 +19,7 @@
   <img src="docs/mockups/device-detail.png" width="200" alt="Device Detail screen">
   <img src="docs/mockups/alerts.png" width="200" alt="Alerts screen">
 </p>
-<p align="center"><sub>Early mockups - the real app will look different as it develops.</sub></p>
+<p align="center"><sub>The mockups the app was designed from. The real screens follow them, without the v2 parts (Bluetooth, trackers, the compass).</sub></p>
 
 ---
 
@@ -48,7 +49,9 @@
 
 ## Status
 
-**Early development - no code yet.** The project plan was approved, and the scope was revised after lecturer feedback (October 2026). This README describes the plan and the decisions made so far. Everything marked *planned* may change.
+**v1 (Milestone 1) works: Wi-Fi networks.** Scan by button, every scan saved with the phone's GPS location, the map of your route and the networks along it, a page per network with its history and status, alerts for open and WEP networks, trusted devices and settings. Tested on a OnePlus 8T (Android 14). Bluetooth and tracker detection come in v2.
+
+The project plan was approved, and the scope was revised after lecturer feedback (October 2026). Everything marked *planned* may still change.
 
 Aegis started as the project for the Mobile Development module at Griffith College Dublin (2026/27). The goal is to release it publicly once it is stable.
 
@@ -89,14 +92,14 @@ Every device gets a status and a colour on the map:
 
 ### v1 - Wi-Fi networks *(first target)*
 
-- [ ] Project skeleton (Kotlin, Compose, Gradle)
-- [ ] Manual Wi-Fi scan: name (SSID), BSSID, security type (open / WEP / WPA2 / WPA3), signal strength
-- [ ] Save each scan with GPS location (Room)
-- [ ] Map screen with route and network markers (MapLibre + OpenStreetMap)
-- [ ] Device Detail: history of one network, tag as trusted / home / suspicious
-- [ ] Alerts for unsafe networks (open, WEP)
-- [ ] Trusted Devices and Settings screens
-- [ ] Share report (`ACTION_SEND`) and open Wi-Fi settings (`ACTION_WIFI_SETTINGS`)
+- [x] Project skeleton (Kotlin, Compose, Gradle)
+- [x] Manual Wi-Fi scan: name (SSID), BSSID, security type (open / WEP / WPA2 / WPA3), signal strength
+- [x] Save each scan with GPS location (Room)
+- [x] Map screen with route and network markers (MapLibre + OpenStreetMap)
+- [x] Device Detail: history of one network, tag as trusted / home / suspicious
+- [x] Alerts for unsafe networks (open, WEP)
+- [x] Trusted Devices and Settings screens
+- [x] Share report (`ACTION_SEND`) and open Wi-Fi settings (`ACTION_WIFI_SETTINGS`)
 
 ### v2 - Bluetooth and trackers
 
@@ -187,12 +190,14 @@ So Aegis will:
 | Language | **Kotlin** | |
 | UI | **Jetpack Compose** (Material 3) | |
 | Map | **MapLibre Native for Android** + **OpenStreetMap** data | Open source. Tile source planned: OpenFreeMap. No Google Maps. |
-| Storage | **Room** (SQLite) | Local only |
+| Storage | **Room** (SQLite) | Local only, kept out of backups and phone-to-phone transfers |
+| Settings | **Jetpack DataStore** | |
 | Location | Android platform `LocationManager` | No Google Play Services, so it also runs on de-Googled Android |
 | Sensors | Android `SensorManager` | Accelerometer, magnetometer (rotation vector) |
 | Background work | Foreground service (Trip mode), WorkManager | |
 | Build | Gradle (Kotlin DSL) | |
-| SDK *(planned)* | `minSdk 31` (Android 12), `targetSdk` / `compileSdk 36` | Android 12+ has the modern Bluetooth permission model |
+| SDK | `minSdk 31` (Android 12), `targetSdk` / `compileSdk 37` | Android 12+ has the modern Bluetooth permission model |
+| Tests | JUnit on the JVM for the rules; instrumented tests on a phone for the database | CI runs the JVM tests and lint on every push |
 | Editor | Neovim (LazyVim) + Gradle CLI | Android Studio is optional |
 
 ---
@@ -258,7 +263,7 @@ erDiagram
 
 ## Permissions
 
-*Planned. Each one is requested only when the feature that needs it is used.*
+Location is asked for the first time you press Scan; the permissions marked v2 and v3 are not in the app yet.
 
 | Permission | Why |
 |---|---|
@@ -266,7 +271,7 @@ erDiagram
 | `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE` | Start Wi-Fi scans and read the results |
 | `BLUETOOTH_SCAN` *(v2)* | Bluetooth LE scanning. Declared **without** `neverForLocation`: Aegis does link devices to places, and that flag would also filter some Bluetooth beacons out of the results. |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` *(v3)* | Trip mode runs as a visible foreground service |
-| `POST_NOTIFICATIONS` | Alerts (Android 13+) |
+| `POST_NOTIFICATIONS` *(v2)* | Alerts as notifications (Android 13+); v1 shows them in the app |
 | `INTERNET` | Map tiles only |
 
 Android also requires **Location services to be switched on** to return Wi-Fi scan results. The plan is to avoid `ACCESS_BACKGROUND_LOCATION` by running Trip mode as a foreground service that the user starts.
@@ -296,12 +301,10 @@ Android also requires **Location services to be switched on** to return Wi-Fi sc
 
 ## Development setup
 
-*The project skeleton is not in the repository yet. These are the planned requirements and commands.*
-
 **Requirements**
 
 - JDK 17 or newer
-- Android SDK command-line tools with `platform-tools`, `platforms;android-36`, `build-tools;36.0.0`
+- Android SDK command-line tools with `platform-tools` and `platforms;android-37` (Gradle fetches the rest)
 - An Android 12+ phone with USB or wireless debugging enabled (main test device runs Android 14)
 - Optional: [`scrcpy`](https://github.com/Genymobile/scrcpy) to mirror the phone screen on your computer
 
@@ -316,21 +319,36 @@ adb logcat                  # read the app's logs
 scrcpy                      # mirror the phone screen
 ```
 
+**Tests**
+
+```bash
+./gradlew testDebugUnitTest   # the rules, on your computer: security types, alerts, map placement, reports
+./gradlew lintDebug           # Android lint
+# The database tests, on a connected phone. The flag keeps the app installed,
+# so the scans already on the phone are not deleted after the run.
+./gradlew connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
+```
+
+GitHub Actions builds the APK, runs the JVM tests and lint on every push, and keeps the debug APK as a download on each run.
+
 ---
 
 ## Project structure
 
-*Planned.*
-
 ```text
 app/src/main/java/tech/vladr/aegis/
-├── ui/          Compose screens and navigation
-├── scan/        Wi-Fi and Bluetooth scanners
-├── sensors/     location, motion and compass
-├── detection/   rules for unsafe networks and trackers
-└── data/        Room entities, DAOs and repository
-docs/
-└── mockups/     early screen designs
+├── AegisApplication.kt   creates the database, scanner, locator and settings once
+├── MainActivity.kt       the main screens
+├── ui/                   Compose screens, one folder each: map, scan, alerts, settings,
+│                         detail (Device Detail, its own activity); theme and shared components
+├── scan/                 the Wi-Fi scanner and how a network's security is read
+├── sensors/              the GPS location
+├── detection/            the rule for unsafe networks
+└── data/                 Room entities, DAOs, the repository and the settings store
+app/src/test/             JVM tests of the rules
+app/src/androidTest/      database tests that run on a phone
+app/schemas/              the database schema of each version
+docs/mockups/             the screen designs
 ```
 
 ---
@@ -342,10 +360,10 @@ Built for the **Mobile Development** module at **Griffith College Dublin**, 2026
 | Module requirement | How Aegis meets it |
 |---|---|
 | 3+ distinct pages | Six screens (see [Screens](#screens)) |
-| Explicit intent | Tapping a map marker or list row opens Device Detail |
-| Implicit intent | Share report (`ACTION_SEND`), open Wi-Fi settings (`ACTION_WIFI_SETTINGS`) |
-| Sensor use | GPS, magnetometer, accelerometer |
-| Storage with CRUD | Room database with three tables |
+| Explicit intent | Tapping a map marker or list row opens Device Detail, its own activity (`DeviceDetailActivity.intent`) |
+| Implicit intent | Share report (`ACTION_SEND`), open Wi-Fi settings (`ACTION_WIFI_SETTINGS`), in `ui/Intents.kt` |
+| Sensor use | GPS in v1 (`sensors/Locator.kt`); magnetometer and accelerometer in v2 and v3 |
+| Storage with CRUD | Room database with three tables: scans create devices and sightings, every screen reads them, you rename and mark devices, and delete a device, its history or everything |
 
 **Feedback received on the proposal** - camera detection may not be implementable, and constant scanning would drain the battery; start with a simpler version that checks nearby networks. The scope was revised accordingly: v1 focuses on Wi-Fi networks, camera detection was dropped, and scanning is event-driven instead of constant.
 
