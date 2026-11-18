@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tech.vladr.aegis.AegisApplication
+import tech.vladr.aegis.ble.BleDevice
+import tech.vladr.aegis.ble.BluetoothScanner
 import tech.vladr.aegis.data.Device
 import tech.vladr.aegis.data.ScanStore
 import tech.vladr.aegis.data.SettingsSource
@@ -35,6 +37,10 @@ data class ScanUiState(
     val notice: String? = null,
     /** What the database knows about each network, by BSSID: its status, a name you gave it. */
     val known: Map<String, Device> = emptyMap(),
+    /** Bluetooth devices heard in the last scan, trackers first, then by signal. */
+    val bluetooth: List<BleDevice> = emptyList(),
+    /** Why there are no Bluetooth results, when Bluetooth could not be scanned. */
+    val bluetoothNotice: String? = null,
 )
 
 /**
@@ -51,6 +57,7 @@ class ScanViewModel(
     private val repository: ScanStore,
     private val settings: SettingsSource,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val bluetooth: BluetoothScanner = BluetoothScanner { emptyList() },
 ) : ViewModel() {
     private val scan = MutableStateFlow(ScanUiState())
 
@@ -66,11 +73,13 @@ class ScanViewModel(
         scan.update { it.copy(scanning = true, notice = null) }
         viewModelScope.launch {
             coroutineScope {
-                // The GPS fix and the scan take a few seconds each; they run side by side.
+                // The GPS fix and the two scans take seconds each; they run side by side.
                 val fix = async { locator.current() }
+                val heard = async { listenForBluetooth() }
                 val outcome = scanner.scan()
                 val time = clock()
                 val where = fix.await()
+                val (devices, bluetoothNotice) = heard.await()
                 val choices = settings.settings.first()
                 // Old results handed back by Android were saved when they were new.
                 val notice = when {
@@ -81,21 +90,45 @@ class ScanViewModel(
                         null
                     }
                 }
+                // Bluetooth results are always new: there is no list from an earlier scan to hand back.
+                if (devices.isNotEmpty() && (where != null || choices.saveWithoutLocation)) {
+                    repository.saveBluetooth(devices, where, time)
+                }
                 scan.update {
-                    it.copy(networks = outcome.networks, scanning = false, lastScanAt = time, fix = where, notice = notice)
+                    it.copy(
+                        networks = outcome.networks,
+                        scanning = false,
+                        lastScanAt = time,
+                        fix = where,
+                        notice = notice,
+                        bluetooth = devices.sortedWith(compareByDescending<BleDevice> { it.tracker != null }.thenByDescending { it.rssi }),
+                        bluetoothNotice = bluetoothNotice,
+                    )
                 }
             }
         }
     }
 
+    /** The devices heard, or none and the reason: a missing permission or Bluetooth off leaves Wi-Fi scanning as it is. */
+    private suspend fun listenForBluetooth(): Pair<List<BleDevice>, String?> =
+        try {
+            bluetooth.scan() to null
+        } catch (_: SecurityException) {
+            emptyList<BleDevice>() to NO_BLUETOOTH_PERMISSION
+        } catch (_: IllegalStateException) {
+            emptyList<BleDevice>() to BLUETOOTH_OFF
+        }
+
     companion object {
+        const val NO_BLUETOOTH_PERMISSION = "Bluetooth trackers are not scanned: Aegis does not have the nearby devices permission."
+        const val BLUETOOTH_OFF = "Bluetooth is off, so trackers nearby could not be heard."
         const val THROTTLED = "Android allows four scans every two minutes, so these are the latest results it has. They are not saved again."
         const val NOT_SAVED = "No location fix, so this scan was not saved, as set in Settings."
 
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as AegisApplication
-                ScanViewModel(app.scanner, app.locator, app.repository, app.settings)
+                ScanViewModel(app.scanner, app.locator, app.repository, app.settings, bluetooth = app.bluetooth)
             }
         }
     }
