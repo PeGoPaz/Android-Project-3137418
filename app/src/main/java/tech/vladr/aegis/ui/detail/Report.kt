@@ -8,6 +8,7 @@ import kotlin.math.roundToInt
 import tech.vladr.aegis.data.Device
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.data.Sighting
+import tech.vladr.aegis.scan.isPrivateAddress
 import tech.vladr.aegis.scan.isUnsafe
 import tech.vladr.aegis.ui.scan.securityLabel
 
@@ -23,7 +24,7 @@ fun deviceReport(device: Device, sightings: List<Sighting>, zone: ZoneId = ZoneI
         appendLine("Aegis report: ${device.displayName}")
         appendLine()
         if (device.customName != null && device.name.isNotEmpty()) appendLine("Network name: ${device.name}")
-        appendLine("BSSID: ${device.address.uppercase()}")
+        appendLine("BSSID: ${device.address.uppercase()}" + if (isPrivateAddress(device.address)) " (private, can change)" else "")
         appendLine("Protection: ${securityLabel(security)}" + if (security.isUnsafe) " (unsafe)" else "")
         appendLine("Status: ${device.status.name.lowercase()}")
         appendLine("First seen: ${time.format(Instant.ofEpochMilli(device.firstSeen))}")
