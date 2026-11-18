@@ -52,6 +52,7 @@ import kotlin.math.roundToInt
 import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.scan.WifiNetwork
+import tech.vladr.aegis.scan.isPrivateAddress
 import tech.vladr.aegis.scan.isUnsafe
 import tech.vladr.aegis.ui.components.EmptyState
 import tech.vladr.aegis.ui.components.ScreenTitle
@@ -192,7 +193,12 @@ fun NetworkRow(network: WifiNetwork, modifier: Modifier = Modifier, status: Devi
                 }
             }
             Text(
-                "${network.bssid.uppercase()} · ${securityLabel(network.security)} · ${band(network.frequencyMhz)}",
+                listOfNotNull(
+                    network.bssid.uppercase(),
+                    "private MAC".takeIf { isPrivateAddress(network.bssid) },
+                    securityLabel(network.security),
+                    band(network.frequencyMhz),
+                ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

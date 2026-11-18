@@ -53,6 +53,7 @@ import tech.vladr.aegis.data.Device
 import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.data.Sighting
+import tech.vladr.aegis.scan.isPrivateAddress
 import tech.vladr.aegis.scan.isUnsafe
 import tech.vladr.aegis.ui.components.SignalBars
 import tech.vladr.aegis.ui.shareText
@@ -154,12 +155,23 @@ private fun Summary(device: Device, state: DeviceDetailUiState) {
         }
         if (device.customName != null && device.name.isNotEmpty()) Line("Network name", device.name)
         Line("BSSID", device.address.uppercase())
+        if (isPrivateAddress(device.address)) {
+            Text(
+                PRIVATE_ADDRESS,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Line("First seen", format.format(Date(device.firstSeen)))
         Line("Last seen", format.format(Date(device.lastSeen)))
         Line("Seen", times(state.sightings.size))
         state.strongest?.let { Line("Strongest signal", "$it dBm") }
     }
 }
+
+private const val PRIVATE_ADDRESS =
+    "A private address: made up by the device, not given to it by its maker. Phone hotspots use one. " +
+        "It can change, and the same device then comes back as a new one."
 
 @Composable
 private fun Line(label: String, value: String) {

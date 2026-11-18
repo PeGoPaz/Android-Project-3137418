@@ -32,7 +32,7 @@ class ReportTest {
             """
             Aegis report: Airport_Free_WiFi
 
-            BSSID: AA:BB:CC:DD:EE:02
+            BSSID: AA:BB:CC:DD:EE:02 (private, can change)
             Protection: open (unsafe)
             Status: suspicious
             First seen: 2026-11-08 20:54
@@ -47,6 +47,11 @@ class ReportTest {
             """.trimIndent(),
             report,
         )
+    }
+
+    @Test
+    fun onlyAMadeUpAddressIsCalledPrivate() {
+        assertTrue("BSSID: AC:F8:CC:05:0F:A8\n" in deviceReport(airport.copy(address = "ac:f8:cc:05:0f:a8"), emptyList(), ZoneOffset.UTC))
     }
 
     @Test
