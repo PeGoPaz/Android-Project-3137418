@@ -20,18 +20,23 @@ data class Settings(
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
+/** Where the settings come from: the DataStore file, or fixed values in tests. */
+interface SettingsSource {
+    val settings: Flow<Settings>
+}
+
 /**
  * The settings, kept with Jetpack DataStore: a small file of key-value pairs,
  * read as a Flow, so every screen sees a change at once.
  */
-class SettingsStore(private val context: Context) {
+class SettingsStore(private val context: Context) : SettingsSource {
     private object Keys {
         val showHidden = booleanPreferencesKey("show_hidden_networks")
         val saveWithoutLocation = booleanPreferencesKey("save_without_location")
         val unsafeAlerts = booleanPreferencesKey("unsafe_network_alerts")
     }
 
-    val settings: Flow<Settings> = context.dataStore.data.map { prefs ->
+    override val settings: Flow<Settings> = context.dataStore.data.map { prefs ->
         val defaults = Settings()
         Settings(
             showHiddenNetworks = prefs[Keys.showHidden] ?: defaults.showHiddenNetworks,

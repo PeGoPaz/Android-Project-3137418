@@ -14,6 +14,11 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
+/** Something that finds networks: the phone's Wi-Fi, or a fake one in tests. */
+interface NetworkScanner {
+    suspend fun scan(): ScanOutcome
+}
+
 /** What a scan gave, and whether Android let it run or handed back its last results. */
 data class ScanOutcome(val networks: List<WifiNetwork>, val fresh: Boolean)
 
@@ -25,11 +30,11 @@ data class ScanOutcome(val networks: List<WifiNetwork>, val fresh: Boolean)
  * refuses, and the results of the last scan - by any app - are all there is.
  * Needs the precise location permission and location turned on.
  */
-class WifiScanner(private val context: Context) {
+class WifiScanner(private val context: Context) : NetworkScanner {
     private val wifi = context.getSystemService(WifiManager::class.java)
 
     /** Throws SecurityException without the location permission: the screen asks for it first. */
-    suspend fun scan(): ScanOutcome {
+    override suspend fun scan(): ScanOutcome {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             throw SecurityException("Aegis does not have the location permission")
         }
