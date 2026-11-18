@@ -14,17 +14,22 @@ import kotlin.coroutines.resume
 /** Where the phone is, and how sure it is: the true spot is within [accuracyMetres] of it. */
 data class Fix(val latitude: Double, val longitude: Double, val accuracyMetres: Float?)
 
+/** Something that knows where the phone is: GPS, or a fixed place in tests. */
+fun interface LocationSource {
+    suspend fun current(): Fix?
+}
+
 /**
  * The phone's current location from Android's own LocationManager, so Aegis
  * runs without Google Play Services. GPS first; when it has no fix in time,
  * indoors for instance, the network location; and as a last resort the last
  * known location, if it is recent.
  */
-class Locator(private val context: Context, private val clock: () -> Long = System::currentTimeMillis) {
+class Locator(private val context: Context, private val clock: () -> Long = System::currentTimeMillis) : LocationSource {
     private val locations = context.getSystemService(LocationManager::class.java)
 
     /** Null without the permission, with location off, or when no provider gives a fix in time. */
-    suspend fun current(): Fix? {
+    override suspend fun current(): Fix? {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return null
         }

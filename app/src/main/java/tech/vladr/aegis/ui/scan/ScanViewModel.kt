@@ -16,13 +16,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import tech.vladr.aegis.AegisApplication
-import tech.vladr.aegis.data.AegisRepository
 import tech.vladr.aegis.data.Device
-import tech.vladr.aegis.data.SettingsStore
+import tech.vladr.aegis.data.ScanStore
+import tech.vladr.aegis.data.SettingsSource
+import tech.vladr.aegis.scan.NetworkScanner
 import tech.vladr.aegis.scan.WifiNetwork
-import tech.vladr.aegis.scan.WifiScanner
 import tech.vladr.aegis.sensors.Fix
-import tech.vladr.aegis.sensors.Locator
+import tech.vladr.aegis.sensors.LocationSource
 
 /** What the Live Scan screen shows. */
 data class ScanUiState(
@@ -41,12 +41,15 @@ data class ScanUiState(
  * Runs scans for the Live Scan screen, saves them with the phone's location,
  * and keeps the latest results. A ViewModel outlives the screen when the
  * phone is turned, so a scan in progress is not lost.
+ *
+ * It gets what it works with as interfaces, so a test can hand it a fake
+ * scanner, a fixed location and a store in memory.
  */
 class ScanViewModel(
-    private val scanner: WifiScanner,
-    private val locator: Locator,
-    private val repository: AegisRepository,
-    private val settings: SettingsStore,
+    private val scanner: NetworkScanner,
+    private val locator: LocationSource,
+    private val repository: ScanStore,
+    private val settings: SettingsSource,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     private val scan = MutableStateFlow(ScanUiState())

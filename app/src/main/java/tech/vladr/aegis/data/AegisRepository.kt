@@ -6,13 +6,19 @@ import tech.vladr.aegis.detection.isUnsafeNetwork
 import tech.vladr.aegis.scan.WifiNetwork
 import tech.vladr.aegis.sensors.Fix
 
+/** What saving a scan needs: the Live Scan screen depends on this, not on the whole repository. */
+interface ScanStore {
+    fun devices(): Flow<List<Device>>
+    suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean = true): List<Device>
+}
+
 /**
  * The one place the screens go to for data. It turns what a scan found
  * into rows of the database, so no screen needs to know the tables.
  */
-class AegisRepository(private val db: AegisDatabase) {
+class AegisRepository(private val db: AegisDatabase) : ScanStore {
 
-    fun devices(): Flow<List<Device>> = db.devices().observeAll()
+    override fun devices(): Flow<List<Device>> = db.devices().observeAll()
 
     /** Sightings with a location, oldest first: what the map is drawn from. */
     fun locatedSightings(): Flow<List<Sighting>> = db.sightings().observeLocated()
@@ -64,7 +70,7 @@ class AegisRepository(private val db: AegisDatabase) {
      * network gets an alert - once: dismissing it is an answer. All in one
      * transaction, so a scan is saved whole or not at all.
      */
-    suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean = true): List<Device> = db.withTransaction {
+    override suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean): List<Device> = db.withTransaction {
         networks.map { network ->
             val known = db.devices().findByAddress(network.bssid)
             val device = if (known == null) {
