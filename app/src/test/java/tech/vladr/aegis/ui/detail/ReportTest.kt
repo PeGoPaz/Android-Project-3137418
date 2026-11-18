@@ -4,6 +4,7 @@ import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import tech.vladr.aegis.ble.TrackerKind
 import tech.vladr.aegis.data.Device
 import tech.vladr.aegis.data.DeviceKind
 import tech.vladr.aegis.data.DeviceStatus
@@ -43,10 +44,18 @@ class ReportTest {
             - 2026-11-08 20:59  no location  -41 dBm
             - 2026-11-08 20:54  53.31795, -6.24105 (±16 m)  -46 dBm
 
-            Made with Aegis, a privacy-first Wi-Fi scanner.
+            Made with Aegis, a privacy-first Wi-Fi and Bluetooth scanner.
             """.trimIndent(),
             report,
         )
+    }
+
+    @Test
+    fun aTrackerReportSaysWhatItIsAndNothingAboutWifi() {
+        val tag = Device(id = 9, address = "da:a1:19:7c:30:02", name = "", kind = DeviceKind.BLE, tracker = TrackerKind.AIRTAG, firstSeen = nov8, lastSeen = nov8)
+        val report = deviceReport(tag, emptyList(), ZoneOffset.UTC)
+        assertTrue(report.startsWith("Aegis report: AirTag\n\nBluetooth address: DA:A1:19:7C:30:02\nTracker: AirTag\nStatus: unknown\n"))
+        assertTrue("BSSID" !in report && "Protection" !in report)
     }
 
     @Test

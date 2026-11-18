@@ -11,6 +11,9 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import tech.vladr.aegis.ble.BleDevice
+import tech.vladr.aegis.ble.Tracker
+import tech.vladr.aegis.ble.TrackerKind
 import tech.vladr.aegis.scan.WifiNetwork
 import tech.vladr.aegis.sensors.Fix
 
@@ -67,6 +70,18 @@ class RepositoryTest {
         val device = db.devices().findByAddress(cafe.bssid)!!
         assertEquals("Cafe 2", device.name)
         assertEquals(DeviceStatus.TRUSTED, device.status)
+    }
+
+    @Test
+    fun aTrackerIsSavedAsABluetoothDeviceAndKeepsItsKind() = runTest {
+        val tag = BleDevice(address = "da:a1:19:7c:30:02", name = "", rssi = -78, tracker = Tracker(TrackerKind.AIRTAG, separated = true))
+        val saved = repository.saveBluetooth(listOf(tag), Fix(53.3445, -6.2590, 12f), time = 1_000).single()
+        assertEquals(DeviceKind.BLE, saved.kind)
+        assertEquals(TrackerKind.AIRTAG, saved.tracker)
+        // A later advertisement without the Find My message does not forget what it is.
+        repository.saveBluetooth(listOf(tag.copy(tracker = null, rssi = -70)), fix = null, time = 2_000)
+        assertEquals(TrackerKind.AIRTAG, db.devices().findByAddress(tag.address)?.tracker)
+        assertEquals(2, repository.sightings(saved.id).first().size)
     }
 }
 

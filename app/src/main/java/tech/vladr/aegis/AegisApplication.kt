@@ -1,6 +1,7 @@
 package tech.vladr.aegis
 
 import android.app.Application
+import tech.vladr.aegis.ble.BleScanner
 import tech.vladr.aegis.data.AegisDatabase
 import tech.vladr.aegis.data.AegisRepository
 import tech.vladr.aegis.data.SettingsStore
@@ -15,6 +16,7 @@ class AegisApplication : Application() {
     val database: AegisDatabase by lazy { AegisDatabase.create(this) }
     val repository: AegisRepository by lazy { AegisRepository(database) }
     val scanner: WifiScanner by lazy { WifiScanner(this) }
+    val bluetooth: BleScanner by lazy { BleScanner(this) }
     val locator: Locator by lazy { Locator(this) }
     val settings: SettingsStore by lazy { SettingsStore(this) }
 }

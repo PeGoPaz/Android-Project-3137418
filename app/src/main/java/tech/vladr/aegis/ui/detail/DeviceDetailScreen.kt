@@ -50,6 +50,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 import tech.vladr.aegis.data.Device
+import tech.vladr.aegis.data.DeviceKind
 import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.data.Sighting
@@ -150,12 +151,17 @@ private fun Summary(device: Device, state: DeviceDetailUiState) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Tag(securityLabel(security).uppercase(), if (security.isUnsafe) Warning else MaterialTheme.colorScheme.primary)
+            if (device.kind == DeviceKind.BLE) {
+                Tag(device.tracker?.label?.uppercase() ?: "BLUETOOTH", MaterialTheme.colorScheme.primary)
+            } else {
+                Tag(securityLabel(security).uppercase(), if (security.isUnsafe) Warning else MaterialTheme.colorScheme.primary)
+            }
             StatusTag(device.status)
         }
-        if (device.customName != null && device.name.isNotEmpty()) Line("Network name", device.name)
-        Line("BSSID", device.address.uppercase())
-        if (isPrivateAddress(device.address)) {
+        if (device.customName != null && device.name.isNotEmpty()) Line(if (device.kind == DeviceKind.BLE) "Its name" else "Network name", device.name)
+        Line(if (device.kind == DeviceKind.BLE) "Address" else "BSSID", device.address.uppercase())
+        // Bluetooth devices nearly all use made-up addresses; the note is for networks, where it is the exception.
+        if (device.kind == DeviceKind.WIFI_AP && isPrivateAddress(device.address)) {
             Text(
                 PRIVATE_ADDRESS,
                 style = MaterialTheme.typography.bodySmall,

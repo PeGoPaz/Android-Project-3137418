@@ -2,6 +2,7 @@ package tech.vladr.aegis.data
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import tech.vladr.aegis.ble.BleDevice
 import tech.vladr.aegis.detection.isUnsafeNetwork
 import tech.vladr.aegis.scan.WifiNetwork
 import tech.vladr.aegis.sensors.Fix
@@ -10,6 +11,7 @@ import tech.vladr.aegis.sensors.Fix
 interface ScanStore {
     fun devices(): Flow<List<Device>>
     suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean = true): List<Device>
+    suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long): List<Device>
 }
 
 /**
@@ -100,6 +102,42 @@ class AegisRepository(private val db: AegisDatabase) : ScanStore {
             if (alerts && isUnsafeNetwork(device) && db.alerts().countAll(device.id, AlertKind.UNSAFE_NETWORK) == 0) {
                 db.alerts().insert(Alert(deviceId = device.id, kind = AlertKind.UNSAFE_NETWORK, createdAt = time))
             }
+            device
+        }
+    }
+
+    /**
+     * Saves the Bluetooth devices heard in a scan, the same way as networks:
+     * a device the first time, a sighting every time. A tracker kind once
+     * recognised is kept, since not every advertisement carries it.
+     */
+    override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long): List<Device> = db.withTransaction {
+        devices.map { heard ->
+            val known = db.devices().findByAddress(heard.address)
+            val device = if (known == null) {
+                val fresh = Device(
+                    address = heard.address,
+                    name = heard.name,
+                    kind = DeviceKind.BLE,
+                    tracker = heard.tracker?.kind,
+                    firstSeen = time,
+                    lastSeen = time,
+                )
+                fresh.copy(id = db.devices().insert(fresh))
+            } else {
+                known.copy(name = heard.name.ifEmpty { known.name }, tracker = heard.tracker?.kind ?: known.tracker, lastSeen = time)
+                    .also { db.devices().update(it) }
+            }
+            db.sightings().insert(
+                Sighting(
+                    deviceId = device.id,
+                    latitude = fix?.latitude,
+                    longitude = fix?.longitude,
+                    accuracy = fix?.accuracyMetres,
+                    rssi = heard.rssi,
+                    timestamp = time,
+                ),
+            )
             device
         }
     }

@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 import tech.vladr.aegis.data.Device
+import tech.vladr.aegis.data.DeviceKind
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.data.Sighting
 import tech.vladr.aegis.scan.isPrivateAddress
@@ -23,9 +24,15 @@ fun deviceReport(device: Device, sightings: List<Sighting>, zone: ZoneId = ZoneI
     return buildString {
         appendLine("Aegis report: ${device.displayName}")
         appendLine()
-        if (device.customName != null && device.name.isNotEmpty()) appendLine("Network name: ${device.name}")
-        appendLine("BSSID: ${device.address.uppercase()}" + if (isPrivateAddress(device.address)) " (private, can change)" else "")
-        appendLine("Protection: ${securityLabel(security)}" + if (security.isUnsafe) " (unsafe)" else "")
+        if (device.kind == DeviceKind.BLE) {
+            if (device.customName != null && device.name.isNotEmpty()) appendLine("Its name: ${device.name}")
+            appendLine("Bluetooth address: ${device.address.uppercase()}")
+            device.tracker?.let { appendLine("Tracker: ${it.label}") }
+        } else {
+            if (device.customName != null && device.name.isNotEmpty()) appendLine("Network name: ${device.name}")
+            appendLine("BSSID: ${device.address.uppercase()}" + if (isPrivateAddress(device.address)) " (private, can change)" else "")
+            appendLine("Protection: ${securityLabel(security)}" + if (security.isUnsafe) " (unsafe)" else "")
+        }
         appendLine("Status: ${device.status.name.lowercase()}")
         appendLine("First seen: ${time.format(Instant.ofEpochMilli(device.firstSeen))}")
         appendLine("Last seen: ${time.format(Instant.ofEpochMilli(device.lastSeen))}")
@@ -43,7 +50,7 @@ fun deviceReport(device: Device, sightings: List<Sighting>, zone: ZoneId = ZoneI
             }
         }
         appendLine()
-        append("Made with Aegis, a privacy-first Wi-Fi scanner.")
+        append("Made with Aegis, a privacy-first Wi-Fi and Bluetooth scanner.")
     }
 }
 

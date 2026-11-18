@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
@@ -49,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
+import tech.vladr.aegis.ble.BleDevice
 import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.scan.WifiNetwork
@@ -62,7 +65,12 @@ import tech.vladr.aegis.ui.components.Tag
 import tech.vladr.aegis.ui.theme.Suspicious
 import tech.vladr.aegis.ui.theme.Warning
 
-private val LOCATION_PERMISSIONS = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+/** Location for Wi-Fi, and "nearby devices" for Bluetooth; Wi-Fi scanning works with the first alone. */
+private val SCAN_PERMISSIONS = arrayOf(
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION,
+    Manifest.permission.BLUETOOTH_SCAN,
+)
 
 /** Networks from the latest scan, strongest signal first, and the button that scans. */
 @Composable
@@ -70,6 +78,7 @@ fun ScanScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: ScanViewModel = vi
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var problem by remember { mutableStateOf<String?>(null) }
+    var askedOnce by remember { mutableStateOf(false) }
 
     // Scans only when Android will return networks: with the permission, and with location on.
     fun scanIfAllowed(askIfNeeded: () -> Unit) {
@@ -88,12 +97,21 @@ fun ScanScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: ScanViewModel = vi
         scanIfAllowed(askIfNeeded = { problem = NO_PERMISSION })
     }
 
-    fun startScan() = scanIfAllowed(askIfNeeded = { askPermission.launch(LOCATION_PERMISSIONS) })
+    fun startScan() {
+        // Asked together, once each: Android stops showing a dialog the user has turned down twice.
+        val missing = SCAN_PERMISSIONS.filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty() && !askedOnce) {
+            askedOnce = true
+            askPermission.launch(missing.toTypedArray())
+        } else {
+            scanIfAllowed(askIfNeeded = { askPermission.launch(SCAN_PERMISSIONS) })
+        }
+    }
 
     Column(Modifier.fillMaxSize()) {
         ScreenTitle(
             title = "Live Scan",
-            subtitle = if (state.lastScanAt == null) "No scan yet" else "${state.networks.size} networks nearby",
+            subtitle = if (state.lastScanAt == null) "No scan yet" else "${state.networks.size} networks, ${state.bluetooth.size} Bluetooth devices nearby",
         )
         state.lastScanAt?.let { at ->
             val place = state.fix?.let { fix -> fix.accuracyMetres?.let { "location ±${it.roundToInt()} m" } ?: "location found" }
@@ -109,11 +127,23 @@ fun ScanScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: ScanViewModel = vi
                 ) { Text("Turn on location") }
             }
         }
+        state.bluetoothNotice?.let { InfoLine(it, color = Warning) }
         Box(Modifier.weight(1f)) {
-            if (state.networks.isEmpty()) {
-                EmptyState(if (state.lastScanAt == null) "Press Scan to see the Wi-Fi networks around you." else "No networks found.")
+            if (state.networks.isEmpty() && state.bluetooth.isEmpty()) {
+                EmptyState(
+                    if (state.lastScanAt == null) "Press Scan to see the Wi-Fi networks and Bluetooth devices around you." else "Nothing found.",
+                )
             } else {
                 LazyColumn {
+                    if (state.bluetooth.isNotEmpty()) {
+                        item(key = "bluetooth") { SectionTitle("Bluetooth") }
+                        items(state.bluetooth, key = { "ble-${it.address}" }) { heard ->
+                            val device = state.known[heard.address]
+                            BluetoothRow(heard, modifier = if (device != null) Modifier.clickable { onDeviceClick(device.id) } else Modifier)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        }
+                        item(key = "wifi") { SectionTitle("Wi-Fi") }
+                    }
                     items(state.networks, key = { it.bssid }) { network ->
                         val device = state.known[network.bssid]
                         NetworkRow(
@@ -206,6 +236,59 @@ fun NetworkRow(network: WifiNetwork, modifier: Modifier = Modifier, status: Devi
         Column(horizontalAlignment = Alignment.End) {
             SignalBars(network.rssi)
             Text("${network.rssi} dBm", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+    )
+}
+
+/** One Bluetooth device: what it is, whether it is a tracker away from its owner, and how close. */
+@Composable
+fun BluetoothRow(device: BleDevice, modifier: Modifier = Modifier) {
+    val tracker = device.tracker
+    Row(
+        modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            Modifier.size(44.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (tracker != null) Icons.Filled.LocationOn else Icons.Filled.Info,
+                contentDescription = null,
+                tint = if (tracker?.separated == true) Warning else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    device.name.ifEmpty { tracker?.kind?.label ?: "Bluetooth device" },
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (tracker?.separated == true) Tag("AWAY FROM OWNER", Warning)
+            }
+            Text(
+                listOfNotNull(device.address.uppercase(), tracker?.let { "tracker" }, "Bluetooth LE").joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            SignalBars(device.rssi)
+            Text("${device.rssi} dBm", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

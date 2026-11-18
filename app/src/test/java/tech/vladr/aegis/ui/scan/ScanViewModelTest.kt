@@ -17,6 +17,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import tech.vladr.aegis.ble.BleDevice
+import tech.vladr.aegis.ble.BluetoothScanner
+import tech.vladr.aegis.ble.Tracker
+import tech.vladr.aegis.ble.TrackerKind
 import tech.vladr.aegis.data.Device
 import tech.vladr.aegis.data.DeviceKind
 import tech.vladr.aegis.data.DeviceStatus
@@ -45,7 +49,16 @@ class ScanViewModelTest {
             saves += Triple(networks, fix, alerts)
             return emptyList()
         }
+
+        val bluetoothSaves = mutableListOf<Pair<List<BleDevice>, Fix?>>()
+        override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long): List<Device> {
+            bluetoothSaves += devices to fix
+            return emptyList()
+        }
     }
+
+    private val watch = BleDevice(address = "c4:11:22:33:44:55", name = "Watch", rssi = -50, tracker = null)
+    private val airtag = BleDevice(address = "da:a1:19:7c:30:02", name = "", rssi = -78, tracker = Tracker(TrackerKind.AIRTAG, separated = true))
 
     private class FixedSettings(value: Settings) : SettingsSource {
         override val settings = MutableStateFlow(value)
@@ -58,7 +71,8 @@ class ScanViewModelTest {
         fix: Fix? = here,
         settings: Settings = Settings(),
         scanner: NetworkScanner = object : NetworkScanner { override suspend fun scan() = outcome },
-    ) = ScanViewModel(scanner, { fix }, store, FixedSettings(settings), clock = { 1_000L })
+        bluetooth: BluetoothScanner = BluetoothScanner { emptyList() },
+    ) = ScanViewModel(scanner, { fix }, store, FixedSettings(settings), clock = { 1_000L }, bluetooth = bluetooth)
 
     @Before
     fun main() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -148,5 +162,46 @@ class ScanViewModelTest {
         assertEquals(1, scans)
         assertEquals(1, store.saves.size)
         assertFalse(vm.state.value.scanning)
+    }
+
+    @Test
+    fun bluetoothDevicesAreShownTrackersFirstAndSavedWithTheLocation() = runTest {
+        val vm = viewModel(bluetooth = { listOf(watch, airtag) })
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
+        vm.scan()
+        assertEquals(listOf(airtag, watch), vm.state.value.bluetooth)
+        assertEquals(listOf(listOf(watch, airtag) to here), store.bluetoothSaves)
+        assertNull(vm.state.value.bluetoothNotice)
+    }
+
+    @Test
+    fun withoutBluetoothWifiIsScannedAsUsual() = runTest {
+        val denied = viewModel(bluetooth = { throw SecurityException("no permission") })
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { denied.state.collect {} }
+        denied.scan()
+        assertEquals(listOf(cafe, hidden), denied.state.value.networks)
+        assertEquals(ScanViewModel.NO_BLUETOOTH_PERMISSION, denied.state.value.bluetoothNotice)
+        assertEquals(1, store.saves.size)
+        assertTrue(store.bluetoothSaves.isEmpty())
+
+        val off = viewModel(bluetooth = { throw IllegalStateException("Bluetooth is off") })
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { off.state.collect {} }
+        off.scan()
+        assertEquals(ScanViewModel.BLUETOOTH_OFF, off.state.value.bluetoothNotice)
+    }
+
+    @Test
+    fun bluetoothFollowsTheSettingForScansWithoutALocation() = runTest {
+        viewModel(fix = null, settings = Settings(saveWithoutLocation = false), bluetooth = { listOf(airtag) }).scan()
+        assertTrue(store.bluetoothSaves.isEmpty())
+        viewModel(fix = null, settings = Settings(saveWithoutLocation = true), bluetooth = { listOf(airtag) }).scan()
+        assertEquals(listOf(listOf(airtag) to null), store.bluetoothSaves)
+    }
+
+    @Test
+    fun throttledWifiDoesNotStopBluetoothBeingSaved() = runTest {
+        viewModel(outcome = ScanOutcome(listOf(cafe), fresh = false), bluetooth = { listOf(watch) }).scan()
+        assertTrue(store.saves.isEmpty())
+        assertEquals(listOf(listOf(watch) to here), store.bluetoothSaves)
     }
 }
