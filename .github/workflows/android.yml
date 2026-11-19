@@ -19,6 +19,11 @@ jobs:
           java-version: 21
       # Caches Gradle's downloads between runs and checks the wrapper is the real one.
       - uses: gradle/actions/setup-gradle@v6
+      # The Android system the screenshot tests run on, which Robolectric downloads (about 200 MB) on first use.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
       - name: Lint
