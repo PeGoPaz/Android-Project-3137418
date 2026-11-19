@@ -11,7 +11,7 @@ import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.data.Sighting
 
 class FollowingRuleTest {
-    private val noon = 1795089600000L // 2026-11-18 12:00 UTC
+    private val noon = 1795003200000L // 2026-11-18 12:00 UTC
     private val minute = 60_000L
 
     // Public places in Dublin city centre, 585 to 655 metres apart.
