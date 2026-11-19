@@ -3,6 +3,8 @@ package tech.vladr.aegis.detection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.Assert.assertTrue
+import tech.vladr.aegis.ble.TrackerKind
 import tech.vladr.aegis.data.Device
 import tech.vladr.aegis.data.DeviceKind
 import tech.vladr.aegis.data.DeviceStatus
@@ -84,5 +86,18 @@ class FollowingRuleTest {
     fun distanceAlongTheEarth() {
         assertEquals(615.2, metresBetween(seen(trinity, 0), seen(stephensGreen, 0)), 0.5)
         assertEquals(0.0, metresBetween(seen(castle, 0), seen(castle, 0)), 0.001)
+    }
+
+    @Test
+    fun theAlertSaysWhereItWasSeenAndWhatToDo() {
+        val airtag = followingReason(4, TrackerKind.AIRTAG)
+        assertTrue(airtag.startsWith("This AirTag was seen in 4 places as you moved."))
+        assertTrue("Tracker Detect" in airtag)
+        assertTrue("its maker's app" in followingReason(3, TrackerKind.TILE).lowercase())
+        assertEquals(
+            "This device was seen in 3 places as you moved. If it is not yours or someone's with you, " +
+                "it may be travelling with you: check your bag, pockets and car.",
+            followingReason(3, null),
+        )
     }
 }

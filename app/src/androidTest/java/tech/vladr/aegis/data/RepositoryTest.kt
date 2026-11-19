@@ -126,4 +126,28 @@ class AlertsTest {
         repository.setStatus(id, DeviceStatus.HOME)
         assertEquals(0, repository.activeAlertCount().first())
     }
+
+    @Test
+    fun aTrackerSeenInThreePlacesRaisesOneFollowingAlert() = runTest {
+        val tag = BleDevice(address = "da:a1:19:7c:30:02", name = "", rssi = -78, tracker = Tracker(TrackerKind.AIRTAG, separated = true))
+        val minute = 60_000L
+        // Trinity College, St Stephen's Green, Dublin Castle: 585 to 655 metres apart.
+        repository.saveBluetooth(listOf(tag), Fix(53.3445, -6.2590, 12f), time = 0)
+        repository.saveBluetooth(listOf(tag), Fix(53.3390, -6.2600, 12f), time = 15 * minute)
+        assertEquals(0, repository.activeAlerts().first().size)
+        repository.saveBluetooth(listOf(tag), Fix(53.3429, -6.2674, 12f), time = 30 * minute)
+        val alert = repository.activeAlerts().first().single()
+        assertEquals(AlertKind.FOLLOWING, alert.alert.kind)
+        assertEquals(3, alert.alert.places)
+        assertEquals("AirTag", alert.displayName)
+
+        // Seen again on the same walk: still one alert.
+        repository.saveBluetooth(listOf(tag), Fix(53.3445, -6.2590, 12f), time = 40 * minute)
+        assertEquals(1, repository.activeAlerts().first().size)
+
+        // Dismissed, it takes a new walk to alert again.
+        repository.dismissAlert(alert.alert.id)
+        repository.saveBluetooth(listOf(tag), Fix(53.3390, -6.2600, 12f), time = 50 * minute)
+        assertEquals(0, repository.activeAlerts().first().size)
+    }
 }

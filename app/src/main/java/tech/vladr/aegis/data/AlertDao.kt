@@ -14,7 +14,8 @@ interface AlertDao {
     @Query(
         """
         SELECT alert.*, device.name AS deviceName, device.customName AS deviceCustomName,
-               device.address AS deviceAddress, device.security AS deviceSecurity
+               device.address AS deviceAddress, device.security AS deviceSecurity,
+               device.kind AS deviceKind, device.tracker AS deviceTracker
         FROM alert JOIN device ON device.id = alert.deviceId
         WHERE alert.dismissed = 0
         ORDER BY alert.createdAt DESC
@@ -28,6 +29,10 @@ interface AlertDao {
     /** Every alert of a kind a device has had, dismissed or not. */
     @Query("SELECT COUNT(*) FROM alert WHERE deviceId = :deviceId AND kind = :kind")
     suspend fun countAll(deviceId: Long, kind: AlertKind): Int
+
+    /** When the last alert of a kind about a device was raised, among those dismissed; null if none was. */
+    @Query("SELECT MAX(createdAt) FROM alert WHERE deviceId = :deviceId AND kind = :kind AND dismissed = 1")
+    suspend fun lastDismissed(deviceId: Long, kind: AlertKind): Long?
 
     @Query("SELECT COUNT(*) FROM alert WHERE dismissed = 0")
     fun observeActiveCount(): Flow<Int>
