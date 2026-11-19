@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/PeGoPaz/Android-Project-3137418/actions/workflows/android.yml"><img alt="Build" src="https://github.com/PeGoPaz/Android-Project-3137418/actions/workflows/android.yml/badge.svg"></a>
-  <img alt="Status" src="https://img.shields.io/badge/status-v1%20Wi--Fi-blue">
+  <img alt="Status" src="https://img.shields.io/badge/status-v2%20Bluetooth%20in%20progress-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Android%2012%2B-3ddc84">
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7f52ff">
   <img alt="No Google Play Services" src="https://img.shields.io/badge/Google%20Play%20Services-not%20required-lightgrey">
@@ -14,12 +14,11 @@
 </p>
 
 <p align="center">
-  <img src="docs/mockups/map.png" width="200" alt="Map screen">
-  <img src="docs/mockups/live-scan.png" width="200" alt="Live Scan screen">
-  <img src="docs/mockups/device-detail.png" width="200" alt="Device Detail screen">
-  <img src="docs/mockups/alerts.png" width="200" alt="Alerts screen">
+  <img src="docs/screenshots/live-scan.png" width="230" alt="Live Scan: an AirTag away from its owner, a Tile and a watch, then Wi-Fi networks">
+  <img src="docs/screenshots/alerts.png" width="230" alt="Alerts: an AirTag following you, and an open network">
+  <img src="docs/screenshots/tracker-detail.png" width="230" alt="Device Detail of the AirTag: where and when it was seen">
 </p>
-<p align="center"><sub>The mockups the app was designed from. The real screens follow them, without the v2 parts (Bluetooth, trackers, the compass).</sub></p>
+<p align="center"><sub>The app's real screens, drawn on the JVM by the screenshot tests from made-up devices on a walk through Dublin city centre - no real networks or places of anyone's. The <a href="docs/mockups">mockups</a> the app was designed from are kept too.</sub></p>
 
 ---
 
@@ -31,7 +30,7 @@
 - [Roadmap](#roadmap)
 - [Timeline](#timeline)
 - [Screens](#screens)
-- [How tracker detection will work](#how-tracker-detection-will-work)
+- [How tracker detection works](#how-tracker-detection-works)
 - [Battery and Android scan limits](#battery-and-android-scan-limits)
 - [Tech stack](#tech-stack)
 - [Sensors](#sensors)
@@ -49,7 +48,9 @@
 
 ## Status
 
-**v1 (Milestone 1) works: Wi-Fi networks.** Scan by button, every scan saved with the phone's GPS location, the map of your route and the networks along it, a page per network with its history and status, alerts for open and WEP networks, trusted devices and settings. Tested on a OnePlus 8T (Android 14). Bluetooth and tracker detection come in v2.
+**v1 (Milestone 1) works: Wi-Fi networks.** Scan by button, every scan saved with the phone's GPS location, the map of your route and the networks along it, a page per network with its history and status, alerts for open and WEP networks, trusted devices and settings. Tested on a OnePlus 8T (Android 14).
+
+**v2 (Bluetooth and trackers) is in progress.** Live Scan listens for Bluetooth LE devices alongside Wi-Fi, recognises AirTags and other Find My accessories, Google Find My Device trackers, Samsung SmartTags, Tile, Chipolo and Pebblebee from what they broadcast, and raises a "following you" alert when one keeps turning up where you go. The rules are tested on the JVM and the database on an emulator in CI; it has not met a real tracker on the phone yet. The compass comes next.
 
 The project plan was approved, and the scope was revised after lecturer feedback (October 2026). Everything marked *planned* may still change.
 
@@ -103,9 +104,12 @@ Every device gets a status and a colour on the map:
 
 ### v2 - Bluetooth and trackers
 
-- [ ] Bluetooth LE scanning
-- [ ] Recognise common tracker types from their broadcast data
-- [ ] "Following you" detection across places (see [below](#how-tracker-detection-will-work))
+- [x] Bluetooth LE scanning, alongside Wi-Fi on Live Scan
+- [x] Recognise common tracker types from their broadcast data, and whether one is away from its owner
+- [x] Point out networks with a made-up (private) address, such as a phone's hotspot
+- [x] "Following you" detection across places, with alerts (see [below](#how-tracker-detection-works))
+- [x] Database version 2, migrated from version 1 by Room
+- [ ] Try it on the phone with real trackers, and tune the numbers
 - [ ] Compass arrow on Live Scan to walk towards a selected device ("hot / cold")
 
 ### v3 - Smarter scanning
@@ -148,16 +152,19 @@ The module has three milestones before the final presentation. Each milestone de
 
 ---
 
-## How tracker detection will work
+## How tracker detection works
 
-*Planned for v2. The exact rules and numbers will be tuned with real data.*
+*Built in v2; the numbers will be tuned on real walks.*
 
-1. Every scan stores a **sighting**: which device, where you were, when, and how strong the signal was.
-2. Devices marked **Trusted** or **Home** are ignored.
-3. A device becomes **suspicious** when it is seen at **several different places** that are **far enough apart**, within a **limited time window**, **while you were moving**.
-4. The "while moving" part uses the accelerometer. It stops false alarms from devices that simply sit next to you, for example in a café.
+1. **Recognising a tracker.** Each Bluetooth advertisement is read for the formats of the finding networks (`ble/Trackers.kt`): Apple's Find My message (company `0x004C`, type `0x12`) says whether it is an AirTag, another Find My accessory or AirPods, and its length whether the device is away from its owner; Google's Find My Device trackers use their own Eddystone frames (`0x40`, `0x41` once separated); Samsung SmartTag, Tile, Chipolo and Pebblebee are known by their service. The values follow [AirGuard](https://github.com/seemoo-lab/AirGuard) (SEEMOO, TU Darmstadt).
+2. **Remembering it.** Every scan stores a **sighting**: which device, where you were, when, and how strong the signal was.
+3. **Following you** (`detection/FollowingRule.kt`). A device is following you when, within **12 hours**, it was seen in **3 places at least 200 m apart**, over **at least 10 minutes**. Something that stays put - a router, a shop's beacon - is only ever seen in one place.
+   - Devices marked **Trusted** or **Home** never count: that is how your own earbuds, the Wi-Fi on your bus or a friend's phone are kept out.
+   - Locations that may be more than 100 m off (from the mobile network rather than GPS) cannot tell places apart and are left out; so are three places passed within a few minutes, which is a drive past.
+   - Bluetooth devices are always checked. Wi-Fi networks only when their address is made up - a phone's hotspot - since a strong router can be heard from places far enough apart to look like three.
+4. **The alert** says where it was seen and what to do. One alert per device stays open; once you dismiss it, it takes another outing with the device to alert again.
 
-**The hard part:** trackers and phones change their Bluetooth address from time to time to protect privacy. Recognising the *same* tracker after it changes address is the main research problem of v2.
+**Still open:** trackers and phones change their Bluetooth address from time to time to protect privacy (an AirTag away from its owner about once a day), so the same tracker can come back as a new device. Recognising it across a change is the main research problem left in v2. Using the accelerometer to check that you were moving is planned with Trip mode (v3).
 
 ---
 
@@ -197,7 +204,7 @@ So Aegis will:
 | Background work | Foreground service (Trip mode), WorkManager | |
 | Build | Gradle (Kotlin DSL) | |
 | SDK | `minSdk 31` (Android 12), `targetSdk` / `compileSdk 37` | Android 12+ has the modern Bluetooth permission model |
-| Tests | JUnit on the JVM for the rules; instrumented tests on a phone for the database | CI runs the JVM tests and lint on every push |
+| Tests | JUnit on the JVM for the rules and view models; Robolectric + Roborazzi screenshot tests of the screens; instrumented tests for the database | CI runs the JVM tests and lint, and the database tests on an emulator, on every push |
 | Editor | Neovim (LazyVim) + Gradle CLI | Android Studio is optional |
 
 ---
@@ -225,10 +232,10 @@ erDiagram
         long id PK
         string address "BSSID or Bluetooth address"
         string name "SSID or advertised name"
+        string customName "a name you gave it"
         string kind "WIFI_AP or BLE"
-        string type "network, phone, watch, earbuds, tracker"
-        string maker "from MAC prefix (OUI)"
         string security "open, WEP, WPA2, WPA3 (Wi-Fi only)"
+        string tracker "AirTag, SmartTag, Tile... (Bluetooth only, version 2)"
         string status "TRUSTED, HOME, UNKNOWN, SUSPICIOUS"
         long firstSeen
         long lastSeen
@@ -254,6 +261,8 @@ erDiagram
 
 **CRUD**
 
+The schema of each version is kept in `app/schemas/`; version 2 added the tracker kind, and Room migrates a version 1 database by itself (`MigrationTest` checks it).
+
 - **Create** - devices and sightings are added on every scan; trusted devices can be added by hand.
 - **Read** - the map, lists and Device Detail load from the database.
 - **Update** - rename a device or change its status.
@@ -263,13 +272,13 @@ erDiagram
 
 ## Permissions
 
-Location is asked for the first time you press Scan; the permissions marked v2 and v3 are not in the app yet.
+Location and nearby devices are asked for the first time you press Scan; the permissions marked v2 and v3 are not in the app yet. Without the nearby devices permission, Wi-Fi scanning works as before and Live Scan says why there are no Bluetooth results.
 
 | Permission | Why |
 |---|---|
 | `ACCESS_FINE_LOCATION` | GPS location for every scan. Android also requires it to read Wi-Fi scan results, even on Android 13+. |
 | `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE` | Start Wi-Fi scans and read the results |
-| `BLUETOOTH_SCAN` *(v2)* | Bluetooth LE scanning. Declared **without** `neverForLocation`: Aegis does link devices to places, and that flag would also filter some Bluetooth beacons out of the results. |
+| `BLUETOOTH_SCAN` | Bluetooth LE scanning ("nearby devices"). Declared **without** `neverForLocation`: Aegis does link devices to places, and that flag would also filter some Bluetooth beacons out of the results. |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` *(v3)* | Trip mode runs as a visible foreground service |
 | `POST_NOTIFICATIONS` *(v2)* | Alerts as notifications (Android 13+); v1 shows them in the app |
 | `INTERNET` | Map tiles only |
@@ -322,14 +331,16 @@ scrcpy                      # mirror the phone screen
 **Tests**
 
 ```bash
-./gradlew testDebugUnitTest   # the rules, on your computer: security types, alerts, map placement, reports
+./gradlew testDebugUnitTest   # on your computer: the rules, the view models, and the screens drawn by Robolectric
 ./gradlew lintDebug           # Android lint
+./gradlew recordRoborazziDebug   # save the screenshots in docs/screenshots again
+./gradlew verifyRoborazziDebug   # fail if a screen no longer looks like its screenshot
 # The database tests, on a connected phone. The flag keeps the app installed,
 # so the scans already on the phone are not deleted after the run.
 ./gradlew connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 ```
 
-GitHub Actions builds the APK, runs the JVM tests and lint on every push, and keeps the debug APK as a download on each run.
+GitHub Actions builds the APK, runs the JVM tests and lint, runs the database tests on an Android emulator, and keeps the debug APK as a download on each run. Screenshots are compared only locally: text is drawn slightly differently on macOS and Linux.
 
 ---
 
@@ -341,13 +352,15 @@ app/src/main/java/tech/vladr/aegis/
 ├── MainActivity.kt       the main screens
 ├── ui/                   Compose screens, one folder each: map, scan, alerts, settings,
 │                         detail (Device Detail, its own activity); theme and shared components
-├── scan/                 the Wi-Fi scanner and how a network's security is read
+├── scan/                 the Wi-Fi scanner, how a network's security is read, private addresses
+├── ble/                  the Bluetooth LE scanner and how trackers are recognised
 ├── sensors/              the GPS location
-├── detection/            the rule for unsafe networks
+├── detection/            the rules: unsafe networks, devices following you
 └── data/                 Room entities, DAOs, the repository and the settings store
-app/src/test/             JVM tests of the rules
-app/src/androidTest/      database tests that run on a phone
+app/src/test/             JVM tests of the rules and view models, and the screenshot tests
+app/src/androidTest/      database and migration tests that run on a phone or emulator
 app/schemas/              the database schema of each version
+docs/screenshots/         the screens, as the screenshot tests draw them
 docs/mockups/             the screen designs
 ```
 
