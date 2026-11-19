@@ -5,6 +5,7 @@ import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
+import tech.vladr.aegis.ble.TrackerKind
 import tech.vladr.aegis.data.Device
 import tech.vladr.aegis.data.DeviceStatus
 import tech.vladr.aegis.data.Sighting
@@ -62,3 +63,15 @@ const val MAX_ACCURACY_M = 100f
 const val WINDOW_MS = 12 * 60 * 60 * 1000L
 const val MIN_SPAN_MS = 10 * 60 * 1000L
 private const val EARTH_RADIUS_M = 6_371_000.0
+
+/** What a "following you" alert says, in words: what was seen, and what to do about it. */
+fun followingReason(places: Int, tracker: TrackerKind?): String {
+    val what = if (tracker != null) "This ${tracker.label}" else "This device"
+    val check = when (tracker) {
+        TrackerKind.AIRTAG, TrackerKind.FIND_MY_ACCESSORY -> " Apple's Tracker Detect app can make it play a sound so you can find it."
+        null -> ""
+        else -> " Its maker's app can make it play a sound to find it."
+    }
+    return "$what was seen in $places places as you moved. If it is not yours or someone's with you, " +
+        "it may be travelling with you: check your bag, pockets and car.$check"
+}

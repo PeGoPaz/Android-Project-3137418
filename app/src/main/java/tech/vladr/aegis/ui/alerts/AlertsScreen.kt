@@ -31,6 +31,8 @@ import java.text.DateFormat
 import java.util.Date
 import tech.vladr.aegis.data.AlertWithDevice
 import tech.vladr.aegis.data.Security
+import tech.vladr.aegis.data.AlertKind
+import tech.vladr.aegis.detection.followingReason
 import tech.vladr.aegis.detection.unsafeReason
 import tech.vladr.aegis.ui.components.EmptyState
 import tech.vladr.aegis.ui.openWifiSettings
@@ -39,7 +41,7 @@ import tech.vladr.aegis.ui.components.Tag
 import tech.vladr.aegis.ui.theme.Suspicious
 import tech.vladr.aegis.ui.theme.Warning
 
-/** Warnings about unsafe networks seen nearby, newest first. */
+/** Warnings about unsafe networks seen nearby and devices that move with you, newest first. */
 @Composable
 fun AlertsScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: AlertsViewModel = viewModel(factory = AlertsViewModel.Factory)) {
     val alerts by viewModel.alerts.collectAsStateWithLifecycle()
@@ -47,7 +49,7 @@ fun AlertsScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: AlertsViewModel 
         ScreenTitle("Alerts", subtitle = alerts?.let { if (it.isEmpty()) "Nothing to worry about" else "${it.size} to look at" })
         val list = alerts ?: return@Column
         if (list.isEmpty()) {
-            EmptyState("No alerts. Open and WEP networks you pass will be listed here, so you know not to use them.")
+            EmptyState("No alerts. Open and WEP networks you pass, and devices that keep turning up where you go, will be listed here.")
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
                 items(list, key = { it.alert.id }) { alert ->
@@ -61,7 +63,8 @@ fun AlertsScreen(onDeviceClick: (Long) -> Unit = {}, viewModel: AlertsViewModel 
 @Composable
 private fun AlertCard(alert: AlertWithDevice, onOpen: () -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val color = if (alert.deviceSecurity == Security.WEP) Suspicious else Warning
+    val following = alert.alert.kind == AlertKind.FOLLOWING
+    val color = if (following || alert.deviceSecurity == Security.WEP) Suspicious else Warning
     Column(
         Modifier
             .fillMaxWidth()
@@ -82,12 +85,22 @@ private fun AlertCard(alert: AlertWithDevice, onOpen: () -> Unit, onDismiss: () 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Tag(if (alert.deviceSecurity == Security.WEP) "WEP" else "OPEN", color)
+            Tag(
+                when {
+                    following -> "FOLLOWING"
+                    alert.deviceSecurity == Security.WEP -> "WEP"
+                    else -> "OPEN"
+                },
+                color,
+            )
         }
-        Text(unsafeReason(alert.deviceSecurity), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            if (following) followingReason(alert.alert.places, alert.deviceTracker) else unsafeReason(alert.deviceSecurity),
+            style = MaterialTheme.typography.bodyMedium,
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             // If you are on this network now, Android's Wi-Fi settings are where you leave it.
-            TextButton(onClick = { openWifiSettings(context) }) { Text("Wi-Fi settings") }
+            if (!following) TextButton(onClick = { openWifiSettings(context) }) { Text("Wi-Fi settings") }
             TextButton(onClick = onDismiss) { Text("Dismiss") }
         }
     }

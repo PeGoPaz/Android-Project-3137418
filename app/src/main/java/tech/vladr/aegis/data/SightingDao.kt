@@ -18,6 +18,10 @@ interface SightingDao {
     @Query("SELECT * FROM sighting WHERE latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY timestamp")
     fun observeLocated(): Flow<List<Sighting>>
 
+    /** One device's history, oldest first, for the rules that look at where it has been. */
+    @Query("SELECT * FROM sighting WHERE deviceId = :deviceId ORDER BY timestamp")
+    suspend fun forDevice(deviceId: Long): List<Sighting>
+
     /** Forgets a device's history but keeps the device. */
     @Query("DELETE FROM sighting WHERE deviceId = :deviceId")
     suspend fun deleteForDevice(deviceId: Long)

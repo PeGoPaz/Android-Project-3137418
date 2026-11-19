@@ -3,8 +3,10 @@ package tech.vladr.aegis.data
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import tech.vladr.aegis.ble.BleDevice
+import tech.vladr.aegis.detection.followingYou
 import tech.vladr.aegis.detection.isUnsafeNetwork
 import tech.vladr.aegis.scan.WifiNetwork
+import tech.vladr.aegis.scan.isPrivateAddress
 import tech.vladr.aegis.sensors.Fix
 
 /** What saving a scan needs: the Live Scan screen depends on this, not on the whole repository. */
@@ -102,6 +104,10 @@ class AegisRepository(private val db: AegisDatabase) : ScanStore {
             if (alerts && isUnsafeNetwork(device) && db.alerts().countAll(device.id, AlertKind.UNSAFE_NETWORK) == 0) {
                 db.alerts().insert(Alert(deviceId = device.id, kind = AlertKind.UNSAFE_NETWORK, createdAt = time))
             }
+            // A network can follow you too: the hotspot of a phone in someone's bag. Only made-up
+            // addresses count - a router keeps its maker's address, and a strong one can be heard
+            // from places far enough apart to look like three.
+            if (isPrivateAddress(device.address)) alertIfFollowing(device, time)
             device
         }
     }
@@ -138,8 +144,23 @@ class AegisRepository(private val db: AegisDatabase) : ScanStore {
                     timestamp = time,
                 ),
             )
+            alertIfFollowing(device, time)
             device
         }
+    }
+
+    /**
+     * Raises a "following you" alert when a device's sightings say it has
+     * moved with you. Once a following alert is open, a later scan does not
+     * add another. After you dismiss it, only sightings since that alert
+     * count, so it takes another outing with the device before it alerts again.
+     */
+    private suspend fun alertIfFollowing(device: Device, time: Long) {
+        if (db.alerts().countActive(device.id, AlertKind.FOLLOWING) > 0) return
+        val lastDismissed = db.alerts().lastDismissed(device.id, AlertKind.FOLLOWING)
+        val since = db.sightings().forDevice(device.id).filter { lastDismissed == null || it.timestamp > lastDismissed }
+        val following = followingYou(device, since) ?: return
+        db.alerts().insert(Alert(deviceId = device.id, kind = AlertKind.FOLLOWING, places = following.places, createdAt = time))
     }
 
     fun activeAlerts(): Flow<List<AlertWithDevice>> = db.alerts().observeActive()
