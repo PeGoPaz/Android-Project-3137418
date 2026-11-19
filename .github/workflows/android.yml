@@ -60,3 +60,9 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: ./gradlew connectedDebugAndroidTest
+      # The emulator's log only says that a test failed; the report says which and why.
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: instrumented-test-report
+          path: app/build/reports/androidTests/connected/
