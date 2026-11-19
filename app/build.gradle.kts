@@ -65,6 +65,10 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.kotlinx.coroutines.android)
+    // Room's migration tests read the schemas with kotlinx.serialization 1.8, and the test
+    // APK must use the app's versions; Navigation alone would hold the app at 1.7.3, and
+    // the mix fails at run time (AbstractMethodError in MigrationTest).
+    implementation(platform(libs.kotlinx.serialization.bom))
     implementation(libs.maplibre)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.runtime)
