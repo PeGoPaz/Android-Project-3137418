@@ -2,7 +2,9 @@ package tech.vladr.aegis.ble
 
 import android.Manifest
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanRecord
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
@@ -12,7 +14,10 @@ import androidx.core.content.ContextCompat
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 /** A Bluetooth LE device heard during a scan, with the strongest signal it came in at. */
 data class BleDevice(val address: String, val name: String, val rssi: Int, val tracker: Tracker?)
@@ -20,6 +25,12 @@ data class BleDevice(val address: String, val name: String, val rssi: Int, val t
 /** Something that listens for Bluetooth devices: the phone's radio, or a fake one in tests. */
 fun interface BluetoothScanner {
     suspend fun scan(): List<BleDevice>
+}
+
+/** Something that keeps listening to one device: the phone's radio, or a fake one in tests. */
+fun interface SignalFollower {
+    /** Every advertisement heard from the device at [address], until the collection is cancelled. */
+    fun follow(address: String): Flow<Reading>
 }
 
 /**
@@ -33,15 +44,14 @@ fun interface BluetoothScanner {
  * catch the slow ones. Needs the "nearby devices" permission (BLUETOOTH_SCAN)
  * and Bluetooth turned on.
  */
-class BleScanner(private val context: Context, private val durationMs: Long = SCAN_MS) : BluetoothScanner {
+class BleScanner(
+    private val context: Context,
+    private val durationMs: Long = SCAN_MS,
+    private val clock: () -> Long = System::currentTimeMillis,
+) : BluetoothScanner, SignalFollower {
     /** Throws SecurityException without the permission, and IllegalStateException with Bluetooth off or a scan Android refused. */
     override suspend fun scan(): List<BleDevice> {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-            throw SecurityException("Aegis does not have the nearby devices permission")
-        }
-        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
-        val scanner = adapter?.takeIf { it.isEnabled }?.bluetoothLeScanner ?: throw IllegalStateException("Bluetooth is off")
-
+        val scanner = leScanner()
         val heard = ConcurrentHashMap<String, BleDevice>()
         // Results and failures arrive on a Binder thread, not the one that reads them.
         val failure = AtomicInteger(NO_FAILURE)
@@ -66,10 +76,59 @@ class BleScanner(private val context: Context, private val durationMs: Long = SC
         try {
             delay(durationMs)
         } finally {
-            scanner.stopScan(callback)
+            stop(scanner, callback)
         }
         if (failure.get() != NO_FAILURE) throw IllegalStateException("Android refused the Bluetooth scan (error ${failure.get()})")
         return heard.values.sortedByDescending { it.rssi }
+    }
+
+    /**
+     * Keeps scanning, for as long as the collection lasts, for one device only:
+     * the filter by address runs in the Bluetooth chip, so the phone is not
+     * woken for every other device nearby. Cancelling the collection stops the
+     * scan. The flow fails with the same exceptions as [scan].
+     *
+     * Trackers change their address now and then (an AirTag away from its
+     * owner, once a day), so this is for the few minutes of a search, not for
+     * recognising a device later.
+     */
+    override fun follow(address: String): Flow<Reading> = callbackFlow {
+        val scanner = leScanner()
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                trySend(Reading(result.rssi, clock()))
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                close(IllegalStateException("Android refused the Bluetooth scan (error $errorCode)"))
+            }
+        }
+        // Android only takes the address in capitals; Aegis stores it in lower case.
+        val filter = ScanFilter.Builder().setDeviceAddress(address.uppercase()).build()
+        val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+        scanner.startScan(listOf(filter), settings, callback)
+        awaitClose { stop(scanner, callback) }
+    }
+
+    /**
+     * Ends a scan, also one Android has ended already: turning Bluetooth off
+     * mid-scan stops it, and stopping it again throws IllegalStateException;
+     * taking the permission away mid-scan makes it throw SecurityException.
+     */
+    private fun stop(scanner: BluetoothLeScanner, callback: ScanCallback) {
+        try {
+            scanner.stopScan(callback)
+        } catch (_: SecurityException) {
+        } catch (_: IllegalStateException) {
+        }
+    }
+
+    private fun leScanner(): BluetoothLeScanner {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            throw SecurityException("Aegis does not have the nearby devices permission")
+        }
+        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
+        return adapter?.takeIf { it.isEnabled }?.bluetoothLeScanner ?: throw IllegalStateException("Bluetooth is off")
     }
 
     private companion object {
