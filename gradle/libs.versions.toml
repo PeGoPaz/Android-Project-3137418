@@ -4,6 +4,7 @@ agp = "9.5.1"
 kotlin = "2.4.21"
 ksp = "2.3.13"
 room = "2.8.5"
+kover = "0.9.11"
 coroutines = "1.11.0"
 serialization = "1.8.1"
 maplibre = "13.7.1"
@@ -53,4 +54,5 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }

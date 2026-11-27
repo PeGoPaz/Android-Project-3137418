@@ -28,8 +28,16 @@ jobs:
         run: ./gradlew testDebugUnitTest
       - name: Lint
         run: ./gradlew lintDebug
+      # Measures JVM unit-test coverage (Robolectric + screenshot tests) and
+      # writes an XML report that can be downloaded from the run.
+      - name: Coverage report
+        run: ./gradlew :app:koverXmlReport
       - name: Build the debug APK
         run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aegis-coverage-report
+          path: app/build/reports/kover/report.xml
       - uses: actions/upload-artifact@v7
         with:
           name: aegis-debug-apk
