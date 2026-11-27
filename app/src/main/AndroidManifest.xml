@@ -16,6 +16,8 @@
     <uses-feature android:name="android.hardware.wifi" android:required="true" />
     <!-- Wi-Fi scanning still works on a phone without Bluetooth LE. -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <!-- The compass that points to a device you are looking for (v2); scanning works without it. -->
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
 
     <application
         android:name=".AegisApplication"
