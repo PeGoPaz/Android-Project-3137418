@@ -6,14 +6,20 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +36,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import tech.vladr.aegis.BuildConfig
+import tech.vladr.aegis.detection.Sensitivity
 import tech.vladr.aegis.ui.components.ScreenTitle
 import tech.vladr.aegis.ui.openWifiSettings
 import tech.vladr.aegis.ui.theme.Suspicious
@@ -70,6 +77,7 @@ fun SettingsScreen(onTrustedDevices: () -> Unit, viewModel: SettingsViewModel = 
             settings.followingNotifications,
             ::setFollowingNotifications,
         )
+        SensitivityChooser(settings.followingSensitivity, viewModel::setFollowingSensitivity)
         Entry("Wi-Fi settings", "Android's own: join, leave or forget networks", onClick = { openWifiSettings(context) })
         Divider()
         Entry("Delete everything", "Every network, sighting and alert Aegis has saved", color = Suspicious, onClick = { confirmDelete = true })
@@ -106,6 +114,31 @@ private fun Toggle(title: String, detail: String, checked: Boolean, onChange: (B
         trailingContent = { Switch(checked = checked, onCheckedChange = onChange) },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
         modifier = Modifier.clickable { onChange(!checked) },
+    )
+}
+
+/** High, normal or low: how readily a device counts as following you, with what the choice means. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SensitivityChooser(current: Sensitivity, onChoose: (Sensitivity) -> Unit) {
+    ListItem(
+        headlineContent = { Text("Following sensitivity") },
+        supportingContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(current.explanation)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    Sensitivity.entries.forEachIndexed { index, level ->
+                        SegmentedButton(
+                            selected = current == level,
+                            onClick = { onChoose(level) },
+                            shape = SegmentedButtonDefaults.itemShape(index, Sensitivity.entries.size),
+                            label = { Text(level.label) },
+                        )
+                    }
+                }
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
     )
 }
 

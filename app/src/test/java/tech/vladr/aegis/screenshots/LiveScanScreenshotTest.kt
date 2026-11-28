@@ -23,6 +23,7 @@ import tech.vladr.aegis.data.ScanStore
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.data.Settings
 import tech.vladr.aegis.data.SettingsSource
+import tech.vladr.aegis.detection.Sensitivity
 import tech.vladr.aegis.scan.NetworkScanner
 import tech.vladr.aegis.scan.ScanOutcome
 import tech.vladr.aegis.scan.WifiNetwork
@@ -64,8 +65,8 @@ class LiveScanScreenshotTest {
     private class Known(devices: List<Device>) : ScanStore {
         private val known = MutableStateFlow(devices)
         override fun devices(): Flow<List<Device>> = known
-        override suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean) = emptyList<Device>()
-        override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long) = emptyList<Device>()
+        override suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean, sensitivity: Sensitivity) = emptyList<Device>()
+        override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long, sensitivity: Sensitivity) = emptyList<Device>()
     }
 
     @Test

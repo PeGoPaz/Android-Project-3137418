@@ -28,6 +28,7 @@ import tech.vladr.aegis.data.ScanStore
 import tech.vladr.aegis.data.Security
 import tech.vladr.aegis.data.Settings
 import tech.vladr.aegis.data.SettingsSource
+import tech.vladr.aegis.detection.Sensitivity
 import tech.vladr.aegis.scan.NetworkScanner
 import tech.vladr.aegis.scan.ScanOutcome
 import tech.vladr.aegis.scan.WifiNetwork
@@ -43,16 +44,19 @@ class ScanViewModelTest {
     /** Remembers every save; its devices are whatever a test puts in. */
     private class MemoryStore : ScanStore {
         val saves = mutableListOf<Triple<List<WifiNetwork>, Fix?, Boolean>>()
+        val sensitivities = mutableListOf<Sensitivity>()
         val known = MutableStateFlow<List<Device>>(emptyList())
         override fun devices(): Flow<List<Device>> = known
-        override suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean): List<Device> {
+        override suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean, sensitivity: Sensitivity): List<Device> {
             saves += Triple(networks, fix, alerts)
+            sensitivities += sensitivity
             return emptyList()
         }
 
         val bluetoothSaves = mutableListOf<Pair<List<BleDevice>, Fix?>>()
-        override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long): List<Device> {
+        override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long, sensitivity: Sensitivity): List<Device> {
             bluetoothSaves += devices to fix
+            sensitivities += sensitivity
             return emptyList()
         }
     }
@@ -121,6 +125,12 @@ class ScanViewModelTest {
     fun alertsCanBeTurnedOff() = runTest {
         viewModel(settings = Settings(unsafeNetworkAlerts = false)).scan()
         assertEquals(listOf(false), store.saves.map { it.third })
+    }
+
+    @Test
+    fun theChosenSensitivityGoesWithBothSaves() = runTest {
+        viewModel(settings = Settings(followingSensitivity = Sensitivity.LOW), bluetooth = { listOf(airtag) }).scan()
+        assertEquals(listOf(Sensitivity.LOW, Sensitivity.LOW), store.sensitivities)
     }
 
     @Test

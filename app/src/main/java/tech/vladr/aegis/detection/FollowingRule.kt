@@ -17,10 +17,12 @@ import tech.vladr.aegis.data.Sighting
 data class Following(val places: Int, val from: Long, val to: Long)
 
 /**
- * Whether a device keeps turning up where you go: seen in [MIN_PLACES]
- * places at least [PLACE_RADIUS_M] apart within [WINDOW_MS], over at least
- * [MIN_SPAN_MS]. Something that stays put - a router, a shop's beacon - is
- * only ever seen in one place, so a device seen in several has moved with you.
+ * Whether a device keeps turning up where you go: seen in enough places far
+ * enough apart within [WINDOW_MS], over long enough. How many, how far and how
+ * long are the [thresholds] of the sensitivity chosen in Settings: three
+ * places 200 m apart over ten minutes by default. Something that stays put -
+ * a router, a shop's beacon - is only ever seen in one place, so a device seen
+ * in several has moved with you.
  * This is the reasoning AirGuard and Apple's own tracking alerts use.
  *
  * It also catches what travels with you on purpose: the Wi-Fi on a bus, a
@@ -29,7 +31,11 @@ data class Following(val places: Int, val from: Long, val to: Long)
  * Sightings without a location, or whose location may be more than
  * [MAX_ACCURACY_M] off, cannot tell places apart and are left out.
  */
-fun followingYou(device: Device, sightings: List<Sighting>): Following? {
+fun followingYou(
+    device: Device,
+    sightings: List<Sighting>,
+    thresholds: FollowingThresholds = Sensitivity.NORMAL.thresholds,
+): Following? {
     if (device.status == DeviceStatus.TRUSTED || device.status == DeviceStatus.HOME) return null
     val located = sightings
         .filter { it.latitude != null && it.longitude != null && (it.accuracy ?: 0f) <= MAX_ACCURACY_M }
@@ -40,10 +46,10 @@ fun followingYou(device: Device, sightings: List<Sighting>): Following? {
     // Each place is where the device was first seen there; a sighting near none of them is a new place.
     val places = mutableListOf<Sighting>()
     for (sighting in recent) {
-        if (places.none { metresBetween(it, sighting) < PLACE_RADIUS_M }) places += sighting
+        if (places.none { metresBetween(it, sighting) < thresholds.placeRadiusMetres }) places += sighting
     }
     val from = recent.first().timestamp
-    if (places.size < MIN_PLACES || latest.timestamp - from < MIN_SPAN_MS) return null
+    if (places.size < thresholds.places || latest.timestamp - from < thresholds.minSpanMs) return null
     return Following(places.size, from, latest.timestamp)
 }
 
@@ -57,11 +63,8 @@ fun metresBetween(a: Sighting, b: Sighting): Double {
     return 2 * EARTH_RADIUS_M * asin(sqrt(h))
 }
 
-const val MIN_PLACES = 3
-const val PLACE_RADIUS_M = 200.0
 const val MAX_ACCURACY_M = 100f
 const val WINDOW_MS = 12 * 60 * 60 * 1000L
-const val MIN_SPAN_MS = 10 * 60 * 1000L
 private const val EARTH_RADIUS_M = 6_371_000.0
 
 /** What a "following you" alert says, in words: what was seen, and what to do about it. */
