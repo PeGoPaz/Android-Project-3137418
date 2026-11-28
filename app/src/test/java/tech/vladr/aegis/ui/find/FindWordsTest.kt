@@ -36,4 +36,12 @@ class FindWordsTest {
         assertEquals("NW", compassPoint(300f))
         assertEquals("N", compassPoint(359.9f))
     }
+
+    @Test
+    fun turnsInWords() {
+        assertEquals("Straight ahead", directionWords(-12f))
+        assertEquals("24° to your right", directionWords(24f))
+        assertEquals("90° to your left", directionWords(-90f))
+        assertEquals("Behind you", directionWords(175f))
+    }
 }

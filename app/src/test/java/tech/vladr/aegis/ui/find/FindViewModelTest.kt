@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -19,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
@@ -108,6 +110,29 @@ class FindViewModelTest {
         runCurrent()
 
         assertEquals(225f, search.state.value.heading!!.degrees)
+    }
+
+    @Test
+    fun turningOnTheSpotPointsToTheDevice() = runTest(dispatcher) {
+        val facing = MutableStateFlow(Heading(0f, HeadingAccuracy.HIGH))
+        val search = viewModel(compass = HeadingSource { facing })
+        backgroundScope.launch { search.state.collect {} }
+        runCurrent()
+        assertNull(search.state.value.bearing)
+
+        // A full turn in twelve seconds, the device to the east: the body blocks it facing any other way.
+        for (degrees in 0 until 360 step 15) {
+            facing.value = Heading(degrees.toFloat(), HeadingAccuracy.HIGH)
+            runCurrent()
+            radio.heard.emit(Reading(if (degrees in 90 until 120) -60 else -75, testScheduler.currentTime))
+            runCurrent()
+            advanceTimeBy(500)
+        }
+
+        val bearing = search.state.value.bearing
+        assertNotNull(bearing)
+        assertEquals(105f, bearing!!.degrees)
+        assertEquals(15, bearing.contrastDb)
     }
 
     @Test

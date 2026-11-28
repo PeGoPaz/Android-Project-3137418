@@ -23,6 +23,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
@@ -31,9 +33,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import tech.vladr.aegis.ble.Bearing
 import tech.vladr.aegis.ble.Trend
 import tech.vladr.aegis.sensors.Heading
+import tech.vladr.aegis.sensors.turn
 import tech.vladr.aegis.ui.theme.Home
 import tech.vladr.aegis.ui.theme.Warning
 
@@ -61,6 +66,21 @@ fun distanceLabel(rssi: Int?): String = when {
 fun compassPoint(degrees: Float): String = POINTS[((degrees + 22.5f) / 45f).toInt() % POINTS.size]
 
 private val POINTS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+
+/**
+ * A turn as the user would say it: [degrees] clockwise is to the right,
+ * anticlockwise to the left. Within 15 degrees is straight ahead: the sweep
+ * finds the device to within 30 degrees, so any closer would be made up.
+ */
+fun directionWords(degrees: Float): String {
+    val size = abs(degrees).roundToInt()
+    return when {
+        size <= 15 -> "Straight ahead"
+        size >= 165 -> "Behind you"
+        degrees > 0 -> "$size° to your right"
+        else -> "$size° to your left"
+    }
+}
 
 @Composable
 fun FindScreen(viewModel: FindViewModel, name: String, onBack: () -> Unit) {
@@ -93,10 +113,14 @@ fun FindScreen(state: FindUiState, name: String, onBack: () -> Unit) {
             }
             Meter(state.level)
             TrendLine(state)
-            state.heading?.let { HeadingLine(it) }
+            // The arrow needs the compass twice: once in the sweep, and once now, to turn the bearing into "left" or "right".
+            state.heading?.let { heading ->
+                Direction(heading, state.bearing)
+                HeadingLine(heading)
+            }
             Text(
-                "Walk slowly, holding the phone in front of you. Your body blocks the signal from behind, " +
-                    "so turning slowly on the spot shows which way it is too.",
+                "Hold the phone in front of you. Your body blocks the signal from behind, so it is strongest " +
+                    "when you face the device. Walk the way of the arrow, and turn round again every few steps.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -139,6 +163,47 @@ private fun TrendLine(state: FindUiState) {
         else -> "Keep walking" to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Text(text, style = MaterialTheme.typography.headlineSmall, color = colour, textAlign = TextAlign.Center)
+}
+
+/** An arrow to where the signal was strongest, turned as the phone turns; or how to make one appear. */
+@Composable
+private fun Direction(heading: Heading, bearing: Bearing?) {
+    if (bearing == null) {
+        Text(
+            "Turn slowly on the spot, all the way round, to see which way it is.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        return
+    }
+    val angle = turn(heading.degrees, bearing.degrees)
+    val colour = MaterialTheme.colorScheme.primary
+    val words = directionWords(angle)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Canvas(
+            Modifier
+                .size(88.dp)
+                .rotate(angle)
+                .semantics { contentDescription = "Strongest signal: $words" },
+        ) {
+            // An arrowhead pointing up, the top of the screen; rotated, it points to the bearing.
+            // Every corner lies inside the circle the box fits, so no turn pushes it onto the text below.
+            val arrow = Path().apply {
+                moveTo(size.width * 0.5f, size.height * 0.1f)
+                lineTo(size.width * 0.8f, size.height * 0.85f)
+                lineTo(size.width * 0.5f, size.height * 0.68f)
+                lineTo(size.width * 0.2f, size.height * 0.85f)
+                close()
+            }
+            drawPath(arrow, colour)
+        }
+        Text("Strongest signal: $words", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Towards ${compassPoint(bearing.degrees)}, ${bearing.contrastDb} dB stronger than other ways",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
