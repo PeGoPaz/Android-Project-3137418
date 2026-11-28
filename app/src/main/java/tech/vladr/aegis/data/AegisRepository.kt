@@ -3,6 +3,7 @@ package tech.vladr.aegis.data
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import tech.vladr.aegis.ble.BleDevice
+import tech.vladr.aegis.detection.Sensitivity
 import tech.vladr.aegis.detection.followingYou
 import tech.vladr.aegis.detection.isUnsafeNetwork
 import tech.vladr.aegis.scan.WifiNetwork
@@ -12,8 +13,15 @@ import tech.vladr.aegis.sensors.Fix
 /** What saving a scan needs: the Live Scan screen depends on this, not on the whole repository. */
 interface ScanStore {
     fun devices(): Flow<List<Device>>
-    suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean = true): List<Device>
-    suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long): List<Device>
+    suspend fun saveScan(
+        networks: List<WifiNetwork>,
+        fix: Fix?,
+        time: Long,
+        alerts: Boolean = true,
+        sensitivity: Sensitivity = Sensitivity.NORMAL,
+    ): List<Device>
+
+    suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long, sensitivity: Sensitivity = Sensitivity.NORMAL): List<Device>
 }
 
 /** Told when a device starts following you, once its alert is saved: the notifications listen for this. */
@@ -82,7 +90,7 @@ class AegisRepository(
      * network gets an alert - once: dismissing it is an answer. All in one
      * transaction, so a scan is saved whole or not at all.
      */
-    override suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean): List<Device> {
+    override suspend fun saveScan(networks: List<WifiNetwork>, fix: Fix?, time: Long, alerts: Boolean, sensitivity: Sensitivity): List<Device> {
         val raised = mutableListOf<Pair<Device, Int>>()
         val saved = db.withTransaction {
             networks.map { network ->
@@ -117,7 +125,7 @@ class AegisRepository(
                 // A network can follow you too: the hotspot of a phone in someone's bag. Only made-up
                 // addresses count - a router keeps its maker's address, and a strong one can be heard
                 // from places far enough apart to look like three.
-                if (isPrivateAddress(device.address)) alertIfFollowing(device, time)?.let { raised += device to it }
+                if (isPrivateAddress(device.address)) alertIfFollowing(device, time, sensitivity)?.let { raised += device to it }
                 device
             }
         }
@@ -130,7 +138,7 @@ class AegisRepository(
      * a device the first time, a sighting every time. A tracker kind once
      * recognised is kept, since not every advertisement carries it.
      */
-    override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long): List<Device> {
+    override suspend fun saveBluetooth(devices: List<BleDevice>, fix: Fix?, time: Long, sensitivity: Sensitivity): List<Device> {
         val raised = mutableListOf<Pair<Device, Int>>()
         val saved = db.withTransaction {
             devices.map { heard ->
@@ -159,7 +167,7 @@ class AegisRepository(
                         timestamp = time,
                     ),
                 )
-                alertIfFollowing(device, time)?.let { raised += device to it }
+                alertIfFollowing(device, time, sensitivity)?.let { raised += device to it }
                 device
             }
         }
@@ -175,11 +183,11 @@ class AegisRepository(
      *
      * @return in how many places the device was seen, when this raised an alert; null when it did not.
      */
-    private suspend fun alertIfFollowing(device: Device, time: Long): Int? {
+    private suspend fun alertIfFollowing(device: Device, time: Long, sensitivity: Sensitivity): Int? {
         if (db.alerts().countActive(device.id, AlertKind.FOLLOWING) > 0) return null
         val lastDismissed = db.alerts().lastDismissed(device.id, AlertKind.FOLLOWING)
         val since = db.sightings().forDevice(device.id).filter { lastDismissed == null || it.timestamp > lastDismissed }
-        val following = followingYou(device, since) ?: return null
+        val following = followingYou(device, since, sensitivity.thresholds) ?: return null
         db.alerts().insert(Alert(deviceId = device.id, kind = AlertKind.FOLLOWING, places = following.places, createdAt = time))
         return following.places
     }

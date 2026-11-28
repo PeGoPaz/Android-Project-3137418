@@ -111,6 +111,7 @@ Every device gets a status and a colour on the map:
 - [x] Point out networks with a made-up (private) address, such as a phone's hotspot
 - [x] "Following you" detection across places, with alerts (see [below](#how-tracker-detection-works))
 - [x] A notification when a device starts following you, which opens its page; it can be turned off in Settings
+- [x] Choose how readily a device counts as following you: High, Normal or Low sensitivity in Settings
 - [x] Database version 2, migrated from version 1 by Room
 - [ ] Try it on the phone with real trackers, and tune the numbers
 - [x] Find a device: its signal warmer or colder as you walk, and a compass arrow to where it is strongest (see [below](#how-finding-works)). On a screen of its own rather than on Live Scan, so the scan for one device runs only while you look for it
@@ -152,7 +153,7 @@ The module has three milestones before the final presentation. Each milestone de
 | **Find** | One Bluetooth device's signal as you walk, warmer or colder, and an arrow to where it is strongest | v2 |
 | **Alerts** | Unsafe networks (v1), trackers following you (v2) | v1 / v2 |
 | **Trusted Devices** | Add, rename or delete your own devices | v1 |
-| **Settings** | Scan frequency, detection sensitivity, Trip mode | v1 / v3 |
+| **Settings** | Hidden networks, saving without a location, alerts and notifications, following sensitivity; scan frequency and Trip mode in v3 | v1 / v2 / v3 |
 
 ---
 
@@ -163,6 +164,14 @@ The module has three milestones before the final presentation. Each milestone de
 1. **Recognising a tracker.** Each Bluetooth advertisement is read for the formats of the finding networks (`ble/Trackers.kt`): Apple's Find My message (company `0x004C`, type `0x12`) says whether it is an AirTag, another Find My accessory or AirPods, and its length whether the device is away from its owner; Google's Find My Device trackers use their own Eddystone frames (`0x40`, `0x41` once separated); Samsung SmartTag, Tile, Chipolo and Pebblebee are known by their service. The values follow [AirGuard](https://github.com/seemoo-lab/AirGuard) (SEEMOO, TU Darmstadt).
 2. **Remembering it.** Every scan stores a **sighting**: which device, where you were, when, and how strong the signal was.
 3. **Following you** (`detection/FollowingRule.kt`). A device is following you when, within **12 hours**, it was seen in **3 places at least 200 m apart**, over **at least 10 minutes**. Something that stays put - a router, a shop's beacon - is only ever seen in one place.
+   - Those are the numbers of **Normal** sensitivity. Settings offers two more (`detection/Sensitivity.kt`), each a trade between alerting sooner and alerting for what travels with you anyway:
+
+     | Sensitivity | Places | At least apart | Over at least |
+     |---|:---:|:---:|:---:|
+     | High | 2 | 150 m | 5 minutes |
+     | **Normal** | **3** | **200 m** | **10 minutes** |
+     | Low | 4 | 300 m | 30 minutes |
+
    - Devices marked **Trusted** or **Home** never count: that is how your own earbuds, the Wi-Fi on your bus or a friend's phone are kept out.
    - Locations that may be more than 100 m off (from the mobile network rather than GPS) cannot tell places apart and are left out; so are three places passed within a few minutes, which is a drive past.
    - Bluetooth devices are always checked. Wi-Fi networks only when their address is made up - a phone's hotspot - since a strong router can be heard from places far enough apart to look like three.

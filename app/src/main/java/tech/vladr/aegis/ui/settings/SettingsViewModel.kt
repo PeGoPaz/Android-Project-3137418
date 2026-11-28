@@ -13,6 +13,7 @@ import tech.vladr.aegis.AegisApplication
 import tech.vladr.aegis.data.AegisRepository
 import tech.vladr.aegis.data.Settings
 import tech.vladr.aegis.data.SettingsStore
+import tech.vladr.aegis.detection.Sensitivity
 
 class SettingsViewModel(private val store: SettingsStore, private val repository: AegisRepository) : ViewModel() {
     val settings: StateFlow<Settings> = store.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Settings())
@@ -21,6 +22,7 @@ class SettingsViewModel(private val store: SettingsStore, private val repository
     fun setSaveWithoutLocation(value: Boolean) = viewModelScope.launch { store.setSaveWithoutLocation(value) }
     fun setUnsafeNetworkAlerts(value: Boolean) = viewModelScope.launch { store.setUnsafeNetworkAlerts(value) }
     fun setFollowingNotifications(value: Boolean) = viewModelScope.launch { store.setFollowingNotifications(value) }
+    fun setFollowingSensitivity(value: Sensitivity) = viewModelScope.launch { store.setFollowingSensitivity(value) }
     fun deleteEverything() = viewModelScope.launch { repository.deleteEverything() }
 
     companion object {

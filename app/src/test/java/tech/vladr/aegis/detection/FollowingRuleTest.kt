@@ -82,6 +82,44 @@ class FollowingRuleTest {
         assertEquals(followingYou(tag, walk), followingYou(tag, walk.reversed()))
     }
 
+    // Sensitivity: how many places, how far apart and over how long.
+
+    private val merrionSquare = 53.3399 to -6.2490
+
+    @Test
+    fun onHighTwoPlacesAreEnough() {
+        val twoPlaces = walk.dropLast(1)
+        assertEquals(2, followingYou(tag, twoPlaces, Sensitivity.HIGH.thresholds)?.places)
+        assertNull(followingYou(tag, twoPlaces, Sensitivity.NORMAL.thresholds))
+    }
+
+    @Test
+    fun onHighCloserSightingsAreTwoPlaces() {
+        // 170 metres north of the gate: two places on High, the same place on Normal.
+        val nearby = listOf(seen(trinity, noon), seen(53.34603 to -6.2590, noon + 6 * minute))
+        assertEquals(2, followingYou(tag, nearby, Sensitivity.HIGH.thresholds)?.places)
+        assertNull(followingYou(tag, nearby, Sensitivity.NORMAL.thresholds))
+    }
+
+    @Test
+    fun onLowThreePlacesAreNotEnough() {
+        assertNull(followingYou(tag, walk, Sensitivity.LOW.thresholds))
+        val longer = walk + seen(merrionSquare, noon + 45 * minute)
+        assertEquals(4, followingYou(tag, longer, Sensitivity.LOW.thresholds)?.places)
+    }
+
+    @Test
+    fun onLowFourPlacesInAQuarterOfAnHourAreNot() {
+        val quick = listOf(seen(trinity, noon), seen(stephensGreen, noon + 5 * minute), seen(castle, noon + 10 * minute), seen(merrionSquare, noon + 15 * minute))
+        assertNull(followingYou(tag, quick, Sensitivity.LOW.thresholds))
+        assertEquals(4, followingYou(tag, quick, Sensitivity.NORMAL.thresholds)?.places)
+    }
+
+    @Test
+    fun normalIsTheDefault() {
+        assertEquals(followingYou(tag, walk, Sensitivity.NORMAL.thresholds), followingYou(tag, walk))
+    }
+
     @Test
     fun distanceAlongTheEarth() {
         assertEquals(615.2, metresBetween(seen(trinity, 0), seen(stephensGreen, 0)), 0.5)

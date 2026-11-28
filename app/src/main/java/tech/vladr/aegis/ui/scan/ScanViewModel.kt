@@ -86,13 +86,13 @@ class ScanViewModel(
                     !outcome.fresh -> THROTTLED
                     where == null && !choices.saveWithoutLocation -> NOT_SAVED
                     else -> {
-                        repository.saveScan(outcome.networks, where, time, alerts = choices.unsafeNetworkAlerts)
+                        repository.saveScan(outcome.networks, where, time, alerts = choices.unsafeNetworkAlerts, sensitivity = choices.followingSensitivity)
                         null
                     }
                 }
                 // Bluetooth results are always new: there is no list from an earlier scan to hand back.
                 if (devices.isNotEmpty() && (where != null || choices.saveWithoutLocation)) {
-                    repository.saveBluetooth(devices, where, time)
+                    repository.saveBluetooth(devices, where, time, sensitivity = choices.followingSensitivity)
                 }
                 scan.update {
                     it.copy(
