@@ -41,6 +41,11 @@
         <activity
             android:name=".ui.detail.DeviceDetailActivity"
             android:exported="false" />
+
+        <!-- The search for one Bluetooth device, opened from its page. -->
+        <activity
+            android:name=".ui.find.FindActivity"
+            android:exported="false" />
     </application>
 
 </manifest>

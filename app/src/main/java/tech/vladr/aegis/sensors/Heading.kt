@@ -49,8 +49,9 @@ fun interface HeadingSource {
  * it, so the compass only uses the battery while a screen shows it. A phone
  * without the sensor gives no headings at all.
  *
- * @param rotation how the screen is turned, a Surface.ROTATION_* value. Only
- *   a screen knows (Activity.display); without one Aegis assumes portrait.
+ * @param rotation how the screen is turned now, a Surface.ROTATION_* value,
+ *   asked on every reading; the app reads it from the phone's display.
+ *   Without it the compass assumes portrait.
  */
 class Compass(
     context: Context,
