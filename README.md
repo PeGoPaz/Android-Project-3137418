@@ -14,9 +14,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/live-scan.png" width="230" alt="Live Scan: an AirTag away from its owner, a Tile and a watch, then Wi-Fi networks">
-  <img src="docs/screenshots/alerts.png" width="230" alt="Alerts: an AirTag following you, and an open network">
-  <img src="docs/screenshots/tracker-detail.png" width="230" alt="Device Detail of the AirTag: where and when it was seen">
+  <img src="docs/screenshots/live-scan.png" width="200" alt="Live Scan: an AirTag away from its owner, a Tile and a watch, then Wi-Fi networks">
+  <img src="docs/screenshots/alerts.png" width="200" alt="Alerts: an AirTag following you, and an open network">
+  <img src="docs/screenshots/tracker-detail.png" width="200" alt="Device Detail of the AirTag: where and when it was seen">
+  <img src="docs/screenshots/find.png" width="200" alt="Find: the AirTag's signal getting warmer, and an arrow to where it is strongest">
 </p>
 <p align="center"><sub>The app's real screens, drawn on the JVM by the screenshot tests from made-up devices on a walk through Dublin city centre - no real networks or places of anyone's. The <a href="docs/mockups">mockups</a> the app was designed from are kept too.</sub></p>
 
@@ -31,6 +32,7 @@
 - [Timeline](#timeline)
 - [Screens](#screens)
 - [How tracker detection works](#how-tracker-detection-works)
+- [How finding works](#how-finding-works)
 - [Battery and Android scan limits](#battery-and-android-scan-limits)
 - [Tech stack](#tech-stack)
 - [Sensors](#sensors)
@@ -50,7 +52,7 @@
 
 **v1 (Milestone 1) works: Wi-Fi networks.** Scan by button, every scan saved with the phone's GPS location, the map of your route and the networks along it, a page per network with its history and status, alerts for open and WEP networks, trusted devices and settings. Tested on a OnePlus 8T (Android 14).
 
-**v2 (Bluetooth and trackers) is in progress.** Live Scan listens for Bluetooth LE devices alongside Wi-Fi, recognises AirTags and other Find My accessories, Google Find My Device trackers, Samsung SmartTags, Tile, Chipolo and Pebblebee from what they broadcast, and raises a "following you" alert when one keeps turning up where you go. The rules are tested on the JVM and the database on an emulator in CI; it has not met a real tracker on the phone yet. The compass comes next.
+**v2 (Bluetooth and trackers) is in progress.** Live Scan listens for Bluetooth LE devices alongside Wi-Fi, recognises AirTags and other Find My accessories, Google Find My Device trackers, Samsung SmartTags, Tile, Chipolo and Pebblebee from what they broadcast, and raises a "following you" alert when one keeps turning up where you go. The rules are tested on the JVM and the database on an emulator in CI; it has not met a real tracker on the phone yet. A Find screen walks you to one device: its signal getting warmer or colder, and a compass arrow to where it is strongest.
 
 The project plan was approved, and the scope was revised after lecturer feedback (October 2026). Everything marked *planned* may still change.
 
@@ -110,7 +112,7 @@ Every device gets a status and a colour on the map:
 - [x] "Following you" detection across places, with alerts (see [below](#how-tracker-detection-works))
 - [x] Database version 2, migrated from version 1 by Room
 - [ ] Try it on the phone with real trackers, and tune the numbers
-- [ ] Compass arrow on Live Scan to walk towards a selected device ("hot / cold")
+- [x] Find a device: its signal warmer or colder as you walk, and a compass arrow to where it is strongest (see [below](#how-finding-works)). On a screen of its own rather than on Live Scan, so the scan for one device runs only while you look for it
 
 ### v3 - Smarter scanning
 
@@ -144,8 +146,9 @@ The module has three milestones before the final presentation. Each milestone de
 | Screen | What it shows | Version |
 |---|---|:---:|
 | **Map** (home) | Your route, scan points and colour-coded devices | v1 |
-| **Live Scan** | Networks and devices from the latest scan, strongest signal first; compass arrow to a selected device | v1 / v2 |
-| **Device Detail** | Where one device was seen, its signal history, status buttons, Share report | v1 |
+| **Live Scan** | Networks and devices from the latest scan, strongest signal first | v1 / v2 |
+| **Device Detail** | Where one device was seen, its signal history, status buttons, Share report; Find it, for a Bluetooth device | v1 / v2 |
+| **Find** | One Bluetooth device's signal as you walk, warmer or colder, and an arrow to where it is strongest | v2 |
 | **Alerts** | Unsafe networks (v1), trackers following you (v2) | v1 / v2 |
 | **Trusted Devices** | Add, rename or delete your own devices | v1 |
 | **Settings** | Scan frequency, detection sensitivity, Trip mode | v1 / v3 |
@@ -165,6 +168,21 @@ The module has three milestones before the final presentation. Each milestone de
 4. **The alert** says where it was seen and what to do. One alert per device stays open; once you dismiss it, it takes another outing with the device to alert again.
 
 **Still open:** trackers and phones change their Bluetooth address from time to time to protect privacy (an AirTag away from its owner about once a day), so the same tracker can come back as a new device. Recognising it across a change is the main research problem left in v2. Using the accelerometer to check that you were moving is planned with Trip mode (v3).
+
+---
+
+## How finding works
+
+*Built in v2; not yet tried with a real tracker.*
+
+On a Bluetooth device's page, **Find it** opens a search for that one device (`ui/find`), its own activity.
+
+1. **Listening to one device.** The scan keeps running with a filter on the device's address, which the Bluetooth chip applies itself, so the phone is not woken for every other device nearby (`BleScanner.follow`). It stops five seconds after the screen goes away: long enough to ride out turning the phone sideways.
+2. **Warmer or colder.** Signal strength jumps by 10 dB or more from one advertisement to the next. The meter shows the **median** of the last 4 seconds, and the trend compares it with the 4 seconds before; it says warmer or colder only when they differ by at least 4 dB (`ble/Signal.kt`).
+3. **Which way.** A phone's antenna cannot tell where a signal comes from, but the person holding it can: a body soaks up 2.4 GHz radio, so with the phone held in front of you the signal is weakest with the device behind you. Turn slowly on the spot and every reading is paired with the compass heading from the rotation vector sensor (`sensors/Heading.kt`) and put in one of twelve 30° slices. The strongest slice, by its median and at least 5 dB above the rest, is where the arrow points (`ble/Bearing.kt`). There is no arrow until two thirds of the circle have been faced: the only side looked at would always win.
+4. **The arrow turns with the phone.** It points at that bearing minus the way the phone faces now, so it keeps pointing the same way while you turn.
+
+Distances are given in words ("close", "a few metres away"), never in metres: walls, bodies and how the device is held change the signal too much for a number to be honest.
 
 ---
 
@@ -214,7 +232,7 @@ So Aegis will:
 | Sensor | Used for |
 |---|---|
 | **GPS** | Tagging every scan with a location; drawing the route; spotting a device that appears in several places |
-| **Magnetometer** + accelerometer (rotation vector) | Compass arrow towards a selected device; turning the map to face the way you walk |
+| **Magnetometer** + accelerometer + gyroscope (rotation vector) | The compass of the Find screen: which way the phone faces, for the arrow to a device (v2); turning the map to face the way you walk (planned) |
 | **Accelerometer** | Knowing if you are walking or still - for the "following" check and for battery-saving Trip mode |
 
 ---
@@ -303,6 +321,7 @@ Android also requires **Location services to be switched on** to return Wi-Fi sc
 - Trackers and phones **change their Bluetooth address**, which makes it hard to recognise the same device over time.
 - Android **limits how often** apps can scan Wi-Fi (see [above](#battery-and-android-scan-limits)).
 - Signal strength gives only a **rough idea of distance** - walls and bodies change it a lot.
+- The Find arrow needs a **slow full turn** with the phone held in front of you; in a small room, reflections off the walls can point it the wrong way.
 - **GPS is weak indoors**, so locations inside buildings can be off.
 - Many legitimate networks share one name across lots of access points (for example `eduroam`), which makes "fake network" detection noisy. It is not in the current plan.
 
@@ -351,10 +370,12 @@ app/src/main/java/tech/vladr/aegis/
 ├── AegisApplication.kt   creates the database, scanner, locator and settings once
 ├── MainActivity.kt       the main screens
 ├── ui/                   Compose screens, one folder each: map, scan, alerts, settings,
-│                         detail (Device Detail, its own activity); theme and shared components
+│                         detail (Device Detail) and find (the search for one device), each
+│                         its own activity; theme and shared components
 ├── scan/                 the Wi-Fi scanner, how a network's security is read, private addresses
-├── ble/                  the Bluetooth LE scanner and how trackers are recognised
-├── sensors/              the GPS location
+├── ble/                  the Bluetooth LE scanner, how trackers are recognised, and the
+│                         signal maths of finding one: warmer or colder, and which way
+├── sensors/              the GPS location and the compass
 ├── detection/            the rules: unsafe networks, devices following you
 └── data/                 Room entities, DAOs, the repository and the settings store
 app/src/test/             JVM tests of the rules and view models, and the screenshot tests
@@ -372,10 +393,10 @@ Built for the **Mobile Development** module at **Griffith College Dublin**, 2026
 
 | Module requirement | How Aegis meets it |
 |---|---|
-| 3+ distinct pages | Six screens (see [Screens](#screens)) |
-| Explicit intent | Tapping a map marker or list row opens Device Detail, its own activity (`DeviceDetailActivity.intent`) |
+| 3+ distinct pages | Seven screens (see [Screens](#screens)) |
+| Explicit intent | Tapping a map marker or list row opens Device Detail, its own activity (`DeviceDetailActivity.intent`); Find it opens the search for a device (`FindActivity.intent`) |
 | Implicit intent | Share report (`ACTION_SEND`), open Wi-Fi settings (`ACTION_WIFI_SETTINGS`), in `ui/Intents.kt` |
-| Sensor use | GPS in v1 (`sensors/Locator.kt`); magnetometer and accelerometer in v2 and v3 |
+| Sensor use | GPS in v1 (`sensors/Locator.kt`); the rotation vector (magnetometer, accelerometer and gyroscope together) as the compass of the Find screen in v2 (`sensors/Heading.kt`); the accelerometer for Trip mode in v3 |
 | Storage with CRUD | Room database with three tables: scans create devices and sightings, every screen reads them, you rename and mark devices, and delete a device, its history or everything |
 
 **Feedback received on the proposal** - camera detection may not be implementable, and constant scanning would drain the battery; start with a simpler version that checks nearby networks. The scope was revised accordingly: v1 focuses on Wi-Fi networks, camera detection was dropped, and scanning is event-driven instead of constant.
