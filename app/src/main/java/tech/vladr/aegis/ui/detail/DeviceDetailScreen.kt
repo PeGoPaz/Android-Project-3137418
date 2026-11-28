@@ -14,8 +14,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,6 +59,7 @@ import tech.vladr.aegis.data.Sighting
 import tech.vladr.aegis.scan.isPrivateAddress
 import tech.vladr.aegis.scan.isUnsafe
 import tech.vladr.aegis.ui.components.SignalBars
+import tech.vladr.aegis.ui.find.FindActivity
 import tech.vladr.aegis.ui.shareText
 import tech.vladr.aegis.ui.components.StatusTag
 import tech.vladr.aegis.ui.components.Tag
@@ -99,12 +102,27 @@ fun DeviceDetailScreen(viewModel: DeviceDetailViewModel, onBack: () -> Unit) {
             item { Summary(device, state) }
             item { StatusChooser(device.status, viewModel::setStatus) }
             item {
-                OutlinedButton(
-                    onClick = { shareText(context, "Aegis report: ${device.displayName}", deviceReport(device, state.sightings)) },
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(Icons.Filled.Share, contentDescription = null)
-                    Text("  Share report")
+                    // Only a Bluetooth device can be followed by its signal; a network's router is not going anywhere.
+                    if (device.kind == DeviceKind.BLE) {
+                        Button(
+                            onClick = { context.startActivity(FindActivity.intent(context, device.address, device.displayName)) },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.Search, contentDescription = null)
+                            Text("  Find it")
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { shareText(context, "Aegis report: ${device.displayName}", deviceReport(device, state.sightings)) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Filled.Share, contentDescription = null)
+                        Text("  Share report")
+                    }
                 }
             }
             item {
