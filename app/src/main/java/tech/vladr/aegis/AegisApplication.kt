@@ -8,6 +8,7 @@ import tech.vladr.aegis.ble.BleScanner
 import tech.vladr.aegis.data.AegisDatabase
 import tech.vladr.aegis.data.AegisRepository
 import tech.vladr.aegis.data.SettingsStore
+import tech.vladr.aegis.notify.FollowingNotifier
 import tech.vladr.aegis.scan.WifiScanner
 import tech.vladr.aegis.sensors.Compass
 import tech.vladr.aegis.sensors.Locator
@@ -18,7 +19,7 @@ import tech.vladr.aegis.sensors.Locator
  */
 class AegisApplication : Application() {
     val database: AegisDatabase by lazy { AegisDatabase.create(this) }
-    val repository: AegisRepository by lazy { AegisRepository(database) }
+    val repository: AegisRepository by lazy { AegisRepository(database, FollowingNotifier(this, settings)) }
     val scanner: WifiScanner by lazy { WifiScanner(this) }
     val bluetooth: BleScanner by lazy { BleScanner(this) }
     val locator: Locator by lazy { Locator(this) }

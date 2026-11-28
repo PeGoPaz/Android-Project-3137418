@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,12 +66,17 @@ import tech.vladr.aegis.ui.components.Tag
 import tech.vladr.aegis.ui.theme.Suspicious
 import tech.vladr.aegis.ui.theme.Warning
 
-/** Location for Wi-Fi, and "nearby devices" for Bluetooth; Wi-Fi scanning works with the first alone. */
-private val SCAN_PERMISSIONS = arrayOf(
+/**
+ * Location for Wi-Fi, "nearby devices" for Bluetooth, and on Android 13 and
+ * later notifications, for a device following you. Wi-Fi scanning works with
+ * the first alone.
+ */
+private val SCAN_PERMISSIONS = listOfNotNull(
     Manifest.permission.ACCESS_FINE_LOCATION,
     Manifest.permission.ACCESS_COARSE_LOCATION,
     Manifest.permission.BLUETOOTH_SCAN,
-)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.POST_NOTIFICATIONS else null,
+).toTypedArray()
 
 /** Networks from the latest scan, strongest signal first, and the button that scans. */
 @Composable

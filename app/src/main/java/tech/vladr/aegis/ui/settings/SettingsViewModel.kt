@@ -20,6 +20,7 @@ class SettingsViewModel(private val store: SettingsStore, private val repository
     fun setShowHiddenNetworks(value: Boolean) = viewModelScope.launch { store.setShowHiddenNetworks(value) }
     fun setSaveWithoutLocation(value: Boolean) = viewModelScope.launch { store.setSaveWithoutLocation(value) }
     fun setUnsafeNetworkAlerts(value: Boolean) = viewModelScope.launch { store.setUnsafeNetworkAlerts(value) }
+    fun setFollowingNotifications(value: Boolean) = viewModelScope.launch { store.setFollowingNotifications(value) }
     fun deleteEverything() = viewModelScope.launch { repository.deleteEverything() }
 
     companion object {

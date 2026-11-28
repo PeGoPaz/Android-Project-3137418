@@ -1,5 +1,10 @@
 package tech.vladr.aegis.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import tech.vladr.aegis.BuildConfig
@@ -34,6 +40,17 @@ fun SettingsScreen(onTrustedDevices: () -> Unit, viewModel: SettingsViewModel = 
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var confirmDelete by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    // Android 13 and later ask before an app may notify; the setting is kept whatever the answer.
+    val askToNotify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+    fun setFollowingNotifications(on: Boolean) {
+        viewModel.setFollowingNotifications(on)
+        if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            askToNotify.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     Column(Modifier.verticalScroll(rememberScrollState())) {
         ScreenTitle("Settings")
@@ -47,6 +64,12 @@ fun SettingsScreen(onTrustedDevices: () -> Unit, viewModel: SettingsViewModel = 
             viewModel::setSaveWithoutLocation,
         )
         Toggle("Unsafe network alerts", "Warn about open and WEP networks", settings.unsafeNetworkAlerts, viewModel::setUnsafeNetworkAlerts)
+        Toggle(
+            "Notify when a device follows you",
+            "A notification as well as the alert, so you see it with Aegis closed",
+            settings.followingNotifications,
+            ::setFollowingNotifications,
+        )
         Entry("Wi-Fi settings", "Android's own: join, leave or forget networks", onClick = { openWifiSettings(context) })
         Divider()
         Entry("Delete everything", "Every network, sighting and alert Aegis has saved", color = Suspicious, onClick = { confirmDelete = true })
