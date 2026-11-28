@@ -110,6 +110,7 @@ Every device gets a status and a colour on the map:
 - [x] Recognise common tracker types from their broadcast data, and whether one is away from its owner
 - [x] Point out networks with a made-up (private) address, such as a phone's hotspot
 - [x] "Following you" detection across places, with alerts (see [below](#how-tracker-detection-works))
+- [x] A notification when a device starts following you, which opens its page; it can be turned off in Settings
 - [x] Database version 2, migrated from version 1 by Room
 - [ ] Try it on the phone with real trackers, and tune the numbers
 - [x] Find a device: its signal warmer or colder as you walk, and a compass arrow to where it is strongest (see [below](#how-finding-works)). On a screen of its own rather than on Live Scan, so the scan for one device runs only while you look for it
@@ -165,7 +166,7 @@ The module has three milestones before the final presentation. Each milestone de
    - Devices marked **Trusted** or **Home** never count: that is how your own earbuds, the Wi-Fi on your bus or a friend's phone are kept out.
    - Locations that may be more than 100 m off (from the mobile network rather than GPS) cannot tell places apart and are left out; so are three places passed within a few minutes, which is a drive past.
    - Bluetooth devices are always checked. Wi-Fi networks only when their address is made up - a phone's hotspot - since a strong router can be heard from places far enough apart to look like three.
-4. **The alert** says where it was seen and what to do. One alert per device stays open; once you dismiss it, it takes another outing with the device to alert again.
+4. **The alert** says where it was seen and what to do. It also comes as a notification (`notify/FollowingNotifier.kt`), posted once the alert is saved, which opens the device's page; Settings can turn it off. One alert per device stays open; once you dismiss it, it takes another outing with the device to alert again.
 
 **Still open:** trackers and phones change their Bluetooth address from time to time to protect privacy (an AirTag away from its owner about once a day), so the same tracker can come back as a new device. Recognising it across a change is the main research problem left in v2. Using the accelerometer to check that you were moving is planned with Trip mode (v3).
 
@@ -298,7 +299,7 @@ Location and nearby devices are asked for the first time you press Scan; the per
 | `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE` | Start Wi-Fi scans and read the results |
 | `BLUETOOTH_SCAN` | Bluetooth LE scanning ("nearby devices"). Declared **without** `neverForLocation`: Aegis does link devices to places, and that flag would also filter some Bluetooth beacons out of the results. |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` *(v3)* | Trip mode runs as a visible foreground service |
-| `POST_NOTIFICATIONS` *(v2)* | Alerts as notifications (Android 13+); v1 shows them in the app |
+| `POST_NOTIFICATIONS` | A notification when a device starts following you. Asked for on Android 13 and later, with the scan permissions or when the setting is turned on; without it the alert is still in the app. |
 | `INTERNET` | Map tiles only |
 
 Android also requires **Location services to be switched on** to return Wi-Fi scan results. The plan is to avoid `ACCESS_BACKGROUND_LOCATION` by running Trip mode as a foreground service that the user starts.
@@ -377,6 +378,7 @@ app/src/main/java/tech/vladr/aegis/
 │                         signal maths of finding one: warmer or colder, and which way
 ├── sensors/              the GPS location and the compass
 ├── detection/            the rules: unsafe networks, devices following you
+├── notify/               the notification for a device following you
 └── data/                 Room entities, DAOs, the repository and the settings store
 app/src/test/             JVM tests of the rules and view models, and the screenshot tests
 app/src/androidTest/      database and migration tests that run on a phone or emulator

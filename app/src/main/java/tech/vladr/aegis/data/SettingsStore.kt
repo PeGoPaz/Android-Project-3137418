@@ -16,6 +16,8 @@ data class Settings(
     val saveWithoutLocation: Boolean = true,
     /** Raise alerts for open and WEP networks. */
     val unsafeNetworkAlerts: Boolean = true,
+    /** Show a notification when a device starts following you, not only an alert in the app. */
+    val followingNotifications: Boolean = true,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -34,6 +36,7 @@ class SettingsStore(private val context: Context) : SettingsSource {
         val showHidden = booleanPreferencesKey("show_hidden_networks")
         val saveWithoutLocation = booleanPreferencesKey("save_without_location")
         val unsafeAlerts = booleanPreferencesKey("unsafe_network_alerts")
+        val followingNotifications = booleanPreferencesKey("following_notifications")
     }
 
     override val settings: Flow<Settings> = context.dataStore.data.map { prefs ->
@@ -42,12 +45,14 @@ class SettingsStore(private val context: Context) : SettingsSource {
             showHiddenNetworks = prefs[Keys.showHidden] ?: defaults.showHiddenNetworks,
             saveWithoutLocation = prefs[Keys.saveWithoutLocation] ?: defaults.saveWithoutLocation,
             unsafeNetworkAlerts = prefs[Keys.unsafeAlerts] ?: defaults.unsafeNetworkAlerts,
+            followingNotifications = prefs[Keys.followingNotifications] ?: defaults.followingNotifications,
         )
     }
 
     suspend fun setShowHiddenNetworks(value: Boolean) = set(Keys.showHidden, value)
     suspend fun setSaveWithoutLocation(value: Boolean) = set(Keys.saveWithoutLocation, value)
     suspend fun setUnsafeNetworkAlerts(value: Boolean) = set(Keys.unsafeAlerts, value)
+    suspend fun setFollowingNotifications(value: Boolean) = set(Keys.followingNotifications, value)
 
     private suspend fun set(key: Preferences.Key<Boolean>, value: Boolean) {
         context.dataStore.edit { it[key] = value }

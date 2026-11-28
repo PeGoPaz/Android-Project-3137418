@@ -13,6 +13,9 @@
     <!-- Bluetooth trackers (v2). Not marked neverForLocation: Aegis does use where a device was heard, and with that flag Android leaves some beacons out of the results. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
 
+    <!-- A notification when a device starts following you (v2); asked for on Android 13 and later. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <uses-feature android:name="android.hardware.wifi" android:required="true" />
     <!-- Wi-Fi scanning still works on a phone without Bluetooth LE. -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
